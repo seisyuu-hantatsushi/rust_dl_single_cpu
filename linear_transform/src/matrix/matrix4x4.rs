@@ -1,7 +1,7 @@
 
 use std::{f64,ops,fmt};
 
-#[derive(Debug,Copy,Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Matrix4x4 {
     pub v : [[f64; 4]; 4]
 }
