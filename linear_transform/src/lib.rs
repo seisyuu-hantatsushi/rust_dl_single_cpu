@@ -7,6 +7,7 @@ mod tests {
     use vector::Vector2;
     use vector::Vector3;
     use matrix::Matrix4x4;
+    use matrix::MatrixMxN;
 
     #[test]
     fn vector2_add(){
@@ -44,7 +45,7 @@ mod tests {
     }
 
     #[test]
-    fn matrix_test(){
+    fn matrix4x4_test() {
 	let m1 = Matrix4x4{
 	    v: [ [1.0, 1.0, 1.0, 1.0],
 		  [2.0, 2.0, 2.0, 2.0],
@@ -92,4 +93,91 @@ mod tests {
 	assert_eq!(m1*Matrix4x4::identity(), Matrix4x4::identity()*m1);
 	assert_eq!(m4*m5, m6);
     }
+
+    #[test]
+    fn matrix_nxm_test(){
+	{
+	    let mut m1 = MatrixMxN::zero(28,28);
+	    assert_eq!(m1.shape(),(28,28));
+	    for i in 0..28 {
+		for j in 0..28 {
+		    m1[i][j] = (i as f64)*100.0+(j as f64);
+		}
+	    }
+	    assert_eq!(m1[0][0],0.0);
+	    assert_eq!(m1[1][0],100.0);
+	    assert_eq!(m1[0][1],1.0);
+	    assert_eq!(m1[2][2],202.0);
+	    assert_eq!(m1[26][27],2627.0);
+	    assert_eq!(m1[27][26],2726.0);
+	    assert_eq!(m1[27][27],2727.0);
+
+
+	    let mut m2 = MatrixMxN::zero(6,5);
+	    assert_eq!(m2.shape(),(6,5));
+	    for i in 0..6 {
+		for j in 0..5 {
+		    m2[i][j] = (i as f64)*100.0+(j as f64);
+		}
+	    }
+
+	    assert_eq!(m2[1][2],102.0);
+
+	    let m3 = m2.transpose();
+	    assert_eq!(m3.shape(),(5,6));
+	    assert_eq!(m3[1][2],201.0);
+	    assert_eq!(m3[2][2],202.0);
+
+	    let m4 = m2.clone() * m3.clone();
+	    {
+		let mut v:f64 = 0.0;
+
+		for k in 0..5 {
+		    v += m2[1][k]*m3[k][2];
+		}
+
+		assert_eq!(m4[1][2],v);
+	    }
+
+	    {
+		let mut v:f64 = 0.0;
+
+		for k in 0..5 {
+		    v += m2[3][k]*m3[k][2];
+		}
+
+		assert_eq!(m4[3][2],v);
+	    }
+	}
+	{
+	    let mut m1 = MatrixMxN::zero(1,28);
+	    let mut m2 = MatrixMxN::zero(28,1);
+	    for k in 0..28 {
+		m1[0][k] = k as f64;
+		m2[k][0] = k as f64;
+	    }
+	    let m3 =  MatrixMxN::mul(&m1, &m2);
+
+	    {
+		let mut v:f64 = 0.0;
+
+		for k in 0..28 {
+		    v += m1[0][k]*m2[k][0];
+		}
+
+		assert_eq!(m4[0][0],v);
+	    }
+
+	    {
+		let mut v:f64 = 0.0;
+
+		for k in 0..28 {
+		    v += m1[0][k]*m2[k][0];
+		}
+
+		assert_eq!(m4[0][0],v);
+	    }
+	}
+    }
+
 }
