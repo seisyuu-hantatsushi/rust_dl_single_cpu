@@ -165,7 +165,7 @@ mod tests {
 		    v += m1[0][k]*m2[k][0];
 		}
 
-		assert_eq!(m4[0][0],v);
+		assert_eq!(m3[0][0],v);
 	    }
 
 	    {
@@ -175,9 +175,21 @@ mod tests {
 		    v += m1[0][k]*m2[k][0];
 		}
 
-		assert_eq!(m4[0][0],v);
+		assert_eq!(m3[0][0],v);
 	    }
 	}
+
+	{
+	    let x = MatrixMxN::from_vector_f64(vec![vec![1.0, 0.5]]);
+	    let y = MatrixMxN::from_vector_f64(vec![vec![0.1, 0.3, 0.5], vec![0.2, 0.4, 0.6]]);
+	    let xy = x * y;
+
+	    assert_eq!(xy.shape(),(1,3));
+	    assert_eq!(xy[0][0], 1.0*0.1+0.5*0.2);
+	    assert_eq!(xy[0][1], 1.0*0.3+0.5*0.4);
+	    assert_eq!(xy[0][2], 1.0*0.5+0.5*0.6);
+	}
+	
     }
 
 }

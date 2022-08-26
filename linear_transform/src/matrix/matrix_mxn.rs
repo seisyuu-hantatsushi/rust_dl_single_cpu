@@ -13,6 +13,10 @@ pub struct MatrixMxN {
     v: Box<[f64]>
 }
 
+fn type_of<T>(_:T) -> String {
+    std::any::type_name::<T>().to_string()
+}
+
 impl fmt::Display for MatrixMxN {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 	let mut str = format!("Matrix ({},{})\n", self.col, self.row);
@@ -86,27 +90,40 @@ impl ops::Sub for MatrixMxN {
 impl ops::Mul for MatrixMxN {
     type Output = Self;
     fn mul(self, other: Self) -> Self {
-	let (c,r) = self.shape();
-	let init_vec = vec![0.0f64; (r*c) as usize];
+	let (c1,r1) = self.shape();
+	let (c2,r2) = other.shape();
+	let init_vec = vec![0.0f64; (r2*c1) as usize];
 	let mut v = init_vec.into_boxed_slice();
-	assert_eq!((r,c),other.shape());
 
-	for i in 0..c {
-	    for j in 0..r {
-		for k in 0..r {
-		    v[i*r + j] += self[i][k]*other[k][j];
+	assert_eq!(r1,c2);
+
+	for i in 0..c1 {
+	    for j in 0..r2 {
+		for k in 0..r1 {
+		    v[i*r2 + j] += self[i][k]*other[k][j];
 		}
 	    }
 	}
 
 	MatrixMxN {
-	    row: r,
-	    col: c,
+	    row: r2,
+	    col: c1,
 	    v : v
 	}
     }
 }
 
+impl PartialEq for MatrixMxN {
+    fn eq(&self, other: &Self) -> bool {
+	self.row == other.row && self.col == other.col && self.v == other.v
+    }
+}
+
+impl Eq for MatrixMxN { }
+
+pub fn identity(m: MatrixMxN) -> MatrixMxN {
+    m.clone()
+}
 
 impl MatrixMxN {
 
@@ -147,6 +164,31 @@ impl MatrixMxN {
 	}
     }
 
+    pub fn from_vector_f64(v:Vec<Vec<f64>>) -> MatrixMxN {
+	let init_vec = vec![0.0f64; v.len()*v[0].len() as usize];
+	let mut boxed_v = init_vec.into_boxed_slice();
+	let r = v[0].len();
+	let c = v.len();
+	let mut counter = 0;
+
+	for vr in v.iter() {
+	    for v in vr.iter() {
+		boxed_v[counter] = *v;
+		counter +=1;
+	    }
+	}
+
+	MatrixMxN {
+	    row: r,
+	    col: c,
+	    v : boxed_v
+	}
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<f64> {
+	self.v.iter()
+    }
+
     pub fn shape(&self) -> (usize, usize) {
 	(self.col,self.row)
     }
@@ -170,23 +212,25 @@ impl MatrixMxN {
     }
 
     pub fn mul(lhs: &MatrixMxN, rhs: &MatrixMxN) -> MatrixMxN {
-	let (c,r) = lhs.shape();
-	let init_vec = vec![0.0f64; (r*c) as usize];
+	let (lc,lr) = lhs.shape();
+	let (rc,rr) = rhs.shape();
+	let init_vec = vec![0.0f64; (rr*lc) as usize];
 	let mut v = init_vec.into_boxed_slice();
-	assert_eq!((r,c),rhs.shape());
+	assert_eq!(lr, rc);
 
-	for i in 0..c {
-	    for j in 0..r {
-		for k in 0..r {
-		    v[i*r + j] += lhs[i][k]*rhs[k][j];
+	for i in 0..lc {
+	    for j in 0..rr {
+		for k in 0..lr {
+		    v[i*rr + j] += lhs[i][k]*rhs[k][j];
 		}
 	    }
 	}
 
 	MatrixMxN {
-	    row: r,
-	    col: c,
+	    row: rr,
+	    col: lc,
 	    v : v
 	}
     }
+
 }
