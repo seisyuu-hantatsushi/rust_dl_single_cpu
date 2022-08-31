@@ -1,14 +1,18 @@
-use std::{f64};
+use std::{ops};
+use num::Float;
 use linear_transform::matrix::MatrixMxN;
 
-pub fn sigmoid(m: &MatrixMxN) -> MatrixMxN {
+pub fn sigmoid<T: Float+ops::AddAssign+ops::MulAssign>(m: &MatrixMxN<T>) -> MatrixMxN<T> {
     let (c,r) = m.shape();
-    let b:Vec<f64> = m.iter().map(|v| 1.0/(1.0+f64::consts::E.powf(-v))).collect();
-    MatrixMxN::from_f64(c, r, &b.into_boxed_slice())
+    let one:T = num::one();
+    let e = one.exp();
+    let minus_one = one.neg();
+    let b:Vec<T> = m.buffer().iter().map(|v| one/(one+e.powf(minus_one*(*v)))).collect();
+    MatrixMxN::<T>::from_array(c,r,&b.into_boxed_slice())
 }
 
-pub fn relu(m: &MatrixMxN) -> MatrixMxN {
+pub fn relu<T: num::Float+ops::AddAssign+ops::MulAssign>(m: &MatrixMxN<T>) -> MatrixMxN<T> {
     let (c,r) = m.shape();
-    let b:Vec<f64> = m.iter().map(|v| if *v > 0.0 {*v} else {0.0}).collect();
-    MatrixMxN::from_f64(c, r, &b)
+    let b:Vec<T> = m.buffer().iter().map(|v| if *v > num::zero() {*v} else {num::zero()}).collect();
+    MatrixMxN::from_array(c, r, &b.into_boxed_slice())
 }

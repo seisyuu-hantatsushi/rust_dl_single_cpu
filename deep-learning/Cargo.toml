@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 linear_transform = { path = "../linear_transform" }
+num = { version = "0.4.0" }

@@ -97,11 +97,11 @@ mod tests {
     #[test]
     fn matrix_nxm_test(){
 	{
-	    let mut m1 = MatrixMxN::zero(28,28);
+	    let mut m1 = MatrixMxN::<f32>::zero(28,28);
 	    assert_eq!(m1.shape(),(28,28));
 	    for i in 0..28 {
 		for j in 0..28 {
-		    m1[i][j] = (i as f64)*100.0+(j as f64);
+		    m1[i][j] = (i as f32)*100.0+(j as f32);
 		}
 	    }
 	    assert_eq!(m1[0][0],0.0);
@@ -113,11 +113,11 @@ mod tests {
 	    assert_eq!(m1[27][27],2727.0);
 
 
-	    let mut m2 = MatrixMxN::zero(6,5);
+	    let mut m2 = MatrixMxN::<f32>::zero(6,5);
 	    assert_eq!(m2.shape(),(6,5));
 	    for i in 0..6 {
 		for j in 0..5 {
-		    m2[i][j] = (i as f64)*100.0+(j as f64);
+		    m2[i][j] = (i as f32)*100.0+(j as f32);
 		}
 	    }
 
@@ -130,7 +130,7 @@ mod tests {
 
 	    let m4 = m2.clone() * m3.clone();
 	    {
-		let mut v:f64 = 0.0;
+		let mut v:f32 = 0.0;
 
 		for k in 0..5 {
 		    v += m2[1][k]*m3[k][2];
@@ -140,7 +140,7 @@ mod tests {
 	    }
 
 	    {
-		let mut v:f64 = 0.0;
+		let mut v:f32 = 0.0;
 
 		for k in 0..5 {
 		    v += m2[3][k]*m3[k][2];
@@ -150,8 +150,8 @@ mod tests {
 	    }
 	}
 	{
-	    let mut m1 = MatrixMxN::zero(1,28);
-	    let mut m2 = MatrixMxN::zero(28,1);
+	    let mut m1 = MatrixMxN::<f64>::zero(1,28);
+	    let mut m2 = MatrixMxN::<f64>::zero(28,1);
 	    for k in 0..28 {
 		m1[0][k] = k as f64;
 		m2[k][0] = k as f64;
@@ -180,8 +180,8 @@ mod tests {
 	}
 
 	{
-	    let x = MatrixMxN::from_vector_f64(vec![vec![1.0, 0.5]]);
-	    let y = MatrixMxN::from_vector_f64(vec![vec![0.1, 0.3, 0.5], vec![0.2, 0.4, 0.6]]);
+	    let x = MatrixMxN::<f32>::from_vector(vec![vec![1.0, 0.5]]);
+	    let y = MatrixMxN::<f32>::from_vector(vec![vec![0.1, 0.3, 0.5], vec![0.2, 0.4, 0.6]]);
 	    let xy = x * y;
 
 	    assert_eq!(xy.shape(),(1,3));
@@ -189,7 +189,7 @@ mod tests {
 	    assert_eq!(xy[0][1], 1.0*0.3+0.5*0.4);
 	    assert_eq!(xy[0][2], 1.0*0.5+0.5*0.6);
 	}
-	
+
     }
 
 }
