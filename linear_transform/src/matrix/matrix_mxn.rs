@@ -364,7 +364,6 @@ impl <T1: std::cmp::PartialOrd+Clone+Copy> MatrixMxN<T1> {
     pub fn max_element_index(&self) -> (usize, usize) {
 	let (c,r) = self.shape();
 	let mut max_index = (0,0);
-	
 	for i in 0 .. c {
 	    for j in 0 .. r {
 		let max_element = self.v[max_index.0*r+max_index.1];
