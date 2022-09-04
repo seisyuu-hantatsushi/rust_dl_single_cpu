@@ -14,6 +14,7 @@ pub struct MatrixMxN<T> where T: Clone {
     v: Box<[T]>
 }
 
+#[cfg(dead_code)]
 fn type_of<T>(_:T) -> String {
     std::any::type_name::<T>().to_string()
 }
@@ -70,6 +71,42 @@ impl<T: num::Num + Copy> ops::Add for MatrixMxN<T> {
     }
 }
 
+impl<T: num::Num + Copy> ops::Add for &MatrixMxN<T> {
+    type Output = MatrixMxN<T>;
+    fn add(self, other: Self) -> MatrixMxN<T> {
+	assert_eq!(self.shape(),other.shape());
+	let (c,r) = self.shape();
+	let mut v:Vec<T> = Vec::with_capacity(r*c);
+	unsafe { v.set_len(r*c) };
+	for i in 0..(r*c) {
+	    v[i] = self.v[i]+other.v[i];
+	}
+	MatrixMxN {
+	    row: r,
+	    col: c,
+	    v : v.into_boxed_slice()
+	}
+    }
+}
+
+impl<T: num::Num + Copy> ops::Add<&MatrixMxN<T>> for MatrixMxN<T> {
+    type Output = MatrixMxN<T>;
+    fn add(self, other: &Self) -> MatrixMxN<T> {
+	assert_eq!(self.shape(),other.shape());
+	let (c,r) = self.shape();
+	let mut v:Vec<T> = Vec::with_capacity(r*c);
+	unsafe { v.set_len(r*c) };
+	for i in 0..(r*c) {
+	    v[i] = self.v[i]+other.v[i];
+	}
+	MatrixMxN {
+	    row: r,
+	    col: c,
+	    v : v.into_boxed_slice()
+	}
+    }
+}
+
 impl<T: num::Num + Copy> ops::Sub for MatrixMxN<T> {
     type Output = Self;
     fn sub(self, other: Self) -> Self {
@@ -110,6 +147,87 @@ impl<T: num::Num + Copy + ops::AddAssign> ops::Mul for MatrixMxN<T> {
 	MatrixMxN {
 	    row: r2,
 	    col: c1,
+	    v : v.into_boxed_slice()
+	}
+    }
+}
+
+impl<T: num::Num + Copy + ops::AddAssign> ops::Mul for &MatrixMxN<T> {
+    type Output = MatrixMxN<T>;
+    fn mul(self, other: Self) -> MatrixMxN<T> {
+	let (c1,r1) = self.shape();
+	let (c2,r2) = other.shape();
+	assert_eq!(r1,c2);
+
+	let mut v:Vec<T> = Vec::with_capacity(r2*c1);
+	unsafe { v.set_len(r2*c1) };
+
+	for i in 0..c1 {
+	    for j in 0..r2 {
+		v[i*r2 + j].set_zero();
+		for k in 0..r1 {
+		    v[i*r2 + j] += self[i][k]*other[k][j];
+		}
+	    }
+	}
+
+	MatrixMxN {
+	    row: r2,
+	    col: c1,
+	    v : v.into_boxed_slice()
+	}
+    }
+}
+
+impl<T: num::Num + Copy + ops::AddAssign> ops::Mul<&MatrixMxN<T>> for MatrixMxN<T> {
+    type Output = MatrixMxN<T>;
+    fn mul(self, other: &Self) -> MatrixMxN<T> {
+	let (c1,r1) = self.shape();
+	let (c2,r2) = other.shape();
+	assert_eq!(r1,c2);
+
+	let mut v:Vec<T> = Vec::with_capacity(r2*c1);
+	unsafe { v.set_len(r2*c1) };
+
+	for i in 0..c1 {
+	    for j in 0..r2 {
+		v[i*r2 + j].set_zero();
+		for k in 0..r1 {
+		    v[i*r2 + j] += self[i][k]*other[k][j];
+		}
+	    }
+	}
+
+	MatrixMxN {
+	    row: r2,
+	    col: c1,
+	    v : v.into_boxed_slice()
+	}
+    }
+}
+
+
+impl ops::Mul<MatrixMxN<f32>> for f32 {
+    type Output = MatrixMxN<f32>;
+    fn mul(self, other:MatrixMxN<f32>) -> Self::Output {
+	let (c,r) = other.shape();
+	let v:Vec<f32> = other.buffer().into_iter().map(|x| x*self).collect::<Vec<f32>>();
+	MatrixMxN {
+	    row: r,
+	    col: c,
+	    v : v.into_boxed_slice()
+	}
+    }
+}
+
+impl<T: num::Num + Copy + ops::AddAssign + ops::MulAssign> ops::Div<T> for MatrixMxN<T> {
+    type Output = Self;
+    fn div(self, other:T) -> Self {
+	let (c,r) = self.shape();
+	let v:Vec<T> = self.buffer().into_iter().map(|x| *x/other).collect::<Vec<T>>();
+	MatrixMxN {
+	    row: r,
+	    col: c,
 	    v : v.into_boxed_slice()
 	}
     }
@@ -239,5 +357,22 @@ impl<T: num::Num+ops::AddAssign+ops::MulAssign+Clone+Copy> MatrixMxN<T> {
 	let (c,r) = self.shape();
 	let b:Vec<T> = self.buffer().iter().map(|v| s*(*v)).collect();
 	MatrixMxN::from_array(c, r, &b.into_boxed_slice())
+    }
+}
+
+impl <T1: std::cmp::PartialOrd+Clone+Copy> MatrixMxN<T1> {
+    pub fn max_element_index(&self) -> (usize, usize) {
+	let (c,r) = self.shape();
+	let mut max_index = (0,0);
+	
+	for i in 0 .. c {
+	    for j in 0 .. r {
+		let max_element = self.v[max_index.0*r+max_index.1];
+		if max_element < self.v[i*r+j] {
+		    max_index = (i, j);
+		}
+	    }
+	}
+	return max_index;
     }
 }
