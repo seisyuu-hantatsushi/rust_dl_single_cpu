@@ -1,4 +1,4 @@
-use std::{ops};
+use std::ops;
 use num::Float;
 use linear_transform::matrix::MatrixMxN;
 

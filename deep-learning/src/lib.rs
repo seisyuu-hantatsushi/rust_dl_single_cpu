@@ -1,5 +1,7 @@
 pub mod activator;
 pub mod output_layer;
+pub mod loss_functions;
+pub mod gradient;
 
 #[cfg(test)]
 mod tests {
@@ -7,6 +9,7 @@ mod tests {
     use std::{f32,f64};
     use activator::*;
     use output_layer::*;
+    use loss_functions::*;
     use linear_transform::matrix::{MatrixMxN,matrix_mxn};
 
     #[test]
@@ -53,7 +56,26 @@ mod tests {
 	    let y = softmax(&a);
 	    let s = y.into_vector().into_iter().reduce(|x,y| x+y).unwrap();
 	    println!("{}", s);
-	    assert_eq!(s, 1.0);
+	    assert!((1.0-s).abs() < 1e-6);
 	}
    }
+    #[test]
+    fn loss_functions_test() {
+	let t = MatrixMxN::<f32>::from_array(1, 10, &[0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+	let y = MatrixMxN::<f32>::from_array(1, 10, &[0.1, 0.05, 0.6, 0.0, 0.05, 0.1, 0.0, 0.1, 0.0, 0.0]);
+	let e = sum_squarted_error(&y,&t);
+	assert!((0.0975-e).abs() < 1e-6);
+
+	let y = MatrixMxN::<f32>::from_array(1, 10, &[0.1, 0.05, 0.1, 0.0, 0.05, 0.1, 0.0, 0.6, 0.0, 0.0]);
+	let e = sum_squarted_error(&y,&t);
+	assert!((0.5975-e).abs() < 1e-6);
+
+	let y = MatrixMxN::<f32>::from_array(1, 10, &[0.1, 0.05, 0.6, 0.0, 0.05, 0.1, 0.0, 0.1, 0.0, 0.0]);
+	let e = cross_entropy_error(&y,&t);
+	assert!((0.510825457-e).abs() < 1e-6);
+
+	let y = MatrixMxN::<f32>::from_array(1, 10, &[0.1, 0.05, 0.1, 0.0, 0.05, 0.1, 0.0, 0.6, 0.0, 0.0]);
+	let e = cross_entropy_error(&y,&t);
+	assert!((2.302584092-e).abs() < 1e-6);
+    }
 }
