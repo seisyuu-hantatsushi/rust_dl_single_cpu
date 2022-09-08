@@ -7,10 +7,11 @@ pub mod gradient;
 mod tests {
     use super::*;
     use std::{f32,f64};
+    use linear_transform::matrix::{MatrixMxN,matrix_mxn};
     use activator::*;
     use output_layer::*;
     use loss_functions::*;
-    use linear_transform::matrix::{MatrixMxN,matrix_mxn};
+    use gradient::*;
 
     #[test]
     fn activator_test() {
@@ -78,4 +79,5 @@ mod tests {
 	let e = cross_entropy_error(&y,&t);
 	assert!((2.302584092-e).abs() < 1e-6);
     }
+
 }
