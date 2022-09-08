@@ -1,5 +1,6 @@
 pub mod vector;
 pub mod matrix;
+pub mod tensor;
 
 #[cfg(test)]
 mod tests {
