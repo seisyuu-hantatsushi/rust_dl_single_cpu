@@ -72,13 +72,13 @@ impl<T:Clone> Tensor<T> {
     }
 }
 
-impl<T: PartialEq+Clone> PartialEq for MatrixMxN<T> {
+impl<T: PartialEq+Clone> PartialEq for Tensor<T> {
     fn eq(&self, other: &Self) -> bool {
 	self.shape() == other.shape() && self.v == other.v
     }
 }
 
-impl<T: PartialEq+Clone> Eq for MatrixMxN<T> { }
+impl<T: PartialEq+Clone> Eq for Tensor<T> { }
 
 fn element<'a, T>(index:Vec<usize>, shape:&'a [usize], v:&'a [T]) -> &'a T {
     if index.len() > 1 {

@@ -2,6 +2,8 @@ pub mod vector;
 pub mod matrix;
 pub mod tensor;
 
+pub use crate::tensor::tensor_base::{Tensor};
+
 #[cfg(test)]
 mod tests {
     use super::*;
