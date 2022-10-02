@@ -2,6 +2,7 @@ pub mod activator;
 pub mod output_layer;
 pub mod loss_functions;
 pub mod gradient;
+pub mod loader;
 
 #[cfg(test)]
 mod tests {
