@@ -43,7 +43,7 @@ mod tests {
 	{
 	    let input_data:Vec<Vec<f32>> = vec![vec![0.3, 2.9, 4.0]];
 	    let a = MatrixMxN::from_vector(input_data);
-	    let y = softmax(&a);
+	    let y = MatrixMxN::<f32>::softmax(&a);
 	    let s = y.into_vector().into_iter().reduce(|x,y| x+y).unwrap();
 	    println!("{}", s);
 	    assert!((1.0-s).abs() < 1e-6);
