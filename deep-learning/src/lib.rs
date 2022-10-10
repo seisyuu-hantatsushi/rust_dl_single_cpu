@@ -2,16 +2,15 @@ pub mod activator;
 pub mod output_layer;
 pub mod loss_functions;
 pub mod gradient;
+pub mod neural_network;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{f32,f64};
+    use std::f32;
     use linear_transform::matrix::{MatrixMxN,matrix_mxn};
     use activator::*;
     use output_layer::*;
-    use loss_functions::*;
-    use gradient::*;
 
     #[test]
     fn network_test() {

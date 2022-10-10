@@ -1,5 +1,4 @@
 use std::ops;
-use num::Float;
 use linear_transform::matrix::MatrixMxN;
 use linear_transform::tensor::tensor_base::Tensor;
 
@@ -46,7 +45,7 @@ impl<T> Activator<MatrixMxN<T>> for MatrixMxN<T>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{f32,f64};
+    use std::f64;
     #[test]
     fn activator_tensor_test () {
 	let v1 = Tensor::<f64>::from_array(&[1, 3], &[-1.0,1.0,2.0]);
