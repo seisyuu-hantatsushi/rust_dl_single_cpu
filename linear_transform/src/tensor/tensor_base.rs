@@ -176,6 +176,47 @@ where T:Clone {
     }
 }
 
+impl <T> Tensor<T>
+    where T: num::Num+std::cmp::PartialOrd+Clone+Copy+fmt::Debug {
+    fn search_max_element(shape:Vec<usize>, v:&[T]) -> (Vec<usize>,T) {
+	if shape.len() > 1 {
+	    let mut holder:Vec<(Vec<usize>, T)> = Vec::new();
+	    for n in 0..shape[0] {
+		let stride = shape[1..shape.len()].iter().fold(1,|prod,s| prod*(*s));
+		let result = Self::search_max_element(shape[1..shape.len()].to_vec(),&v[n*stride..(n+1)*stride]);
+		holder.push(result);
+	    }
+	    let mut max_pair:(Vec<usize>, T) = holder[0].clone();
+	    let mut max_index = 0;
+	    for n in 0..holder.len() {
+		if max_pair.1 < holder[n].1 {
+		    max_pair = holder[n].clone();
+		    max_index = n;
+		}
+	    }
+	    let mut index:Vec<usize> = vec![max_index];
+	    index.append(&mut max_pair.0);
+	    (index, max_pair.1)
+	}
+	else {
+	    let mut max = v[0];
+	    let mut max_index = 0;
+	    for i in 0..shape[0] {
+		if v[i] > max {
+		    max = v[i];
+		    max_index = i;
+		}
+	    }
+	    (vec![max_index], max)
+	}
+    }
+
+    pub fn max_element_index(&self) -> (Vec<usize>,T) {
+	let result = Self::search_max_element(self.shape().to_vec(), self.buffer());
+	result
+    }
+}
+
 impl<'a, T> SubTensor<'a,T>
     where T:Clone{
     pub fn shape(&self) -> &[usize] {
@@ -286,4 +327,19 @@ fn tensor_test() {
     assert_eq!(t[vec![0,2,2,3]],1335.0);
     assert_eq!(t[vec![0,2,2,2]],1333.0);
 
+    let t = Tensor::<f64>::from_array(&[1,5], &[1.0, 0.0, 5.0, 1.0, 2.0]);
+    assert_eq!(t.max_element_index(), (vec![0,2],5.0));
+    let t = Tensor::<f64>::from_array(&[2, 5], &[1.0, 0.0, 5.0, 1.0, 2.0, 1.0, 0.6, 5.0, 6.0, 2.0]);
+    assert_eq!(t.max_element_index(), (vec![1,3],6.0));
+
+    let m_init:[f32;30] = [ 1.0, 0.0, 5.0, 1.0, 2.0,
+			    1.0, 0.6, 5.0, 6.0, 2.0,
+
+			    1.0, 0.0, 7.0, 1.0, 2.0,
+			    1.0, 0.6, 5.0, 6.0, 2.0,
+
+			    1.0, 0.0, 2.0, 1.0, 2.0,
+			    1.0, 0.6, 5.0, 6.0, 2.0 ];
+    let t = Tensor::<f32>::from_array(&[3,2,5],&m_init);
+    assert_eq!(t.max_element_index(), (vec![1,0,2],7.0));
 }

@@ -2,6 +2,7 @@ pub mod activator;
 pub mod output_layer;
 pub mod loss_functions;
 pub mod gradient;
+pub mod loader;
 pub mod neural_network;
 
 #[cfg(test)]
