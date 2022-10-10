@@ -10,7 +10,7 @@ use num;
  */
 
 /*
-  Tensor charactoristic.
+  Tensor characxstoristic.
   Tensor is mapping function.
   T: C^n -> C^n, Tensor Rank is n+1.
   T(v) = T_1(v1) + T_2(v2) -> T = T_1 + T_2
