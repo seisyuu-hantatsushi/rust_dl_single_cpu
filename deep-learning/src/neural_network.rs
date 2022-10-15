@@ -11,7 +11,7 @@ struct Neuron<T>
 where T:num::Float + Clone {
     name: String,
     signal: Rc<RefCell<Tensor<T>>>,
-    grad: Option<Tensor<T>>
+    grad: Option<Rc<RefCell<Tensor<T>>>>
 }
 
 impl<T> fmt::Display for Neuron<T>
@@ -51,14 +51,14 @@ where T:num::Float + Clone {
 struct Synapse<T>
     where T:num::Float + Clone {
     forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-    backward: fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
+    backward: fn (inputs: &Vec<&Tensor<T>>,grad:&Tensor<T>) -> Vec<Tensor<T>>,
 }
 
 impl<T> Synapse<T>
-where T:num::Float + Clone {
+where T:num::Float + num::FromPrimitive + Clone {
 
     pub fn new(forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-	       backward: fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>) -> Synapse<T> {
+	       backward: fn (inputs: &Vec<&Tensor<T>>,grad:&Tensor<T>) -> Vec<Tensor<T>>) -> Synapse<T> {
 	Synapse {
 	    forward,
 	    backward,
@@ -67,26 +67,30 @@ where T:num::Float + Clone {
 
     pub fn forward(&mut self,inputs: &Vec<Rc<RefCell<Tensor<T>>>>) -> Vec<Tensor<T>> {
 	let holder:Vec<Ref<'_,Tensor<T>>> = inputs.iter().map(|i| { i.borrow() }).collect();
-	let inputs:Vec<&Tensor<T>> = holder.iter().map(|h| { h.deref() }).collect();
-	((*self).forward)(&inputs)
+	let inputs_ref:Vec<&Tensor<T>> = holder.iter().map(|h| { h.deref() }).collect();
+	((*self).forward)(&inputs_ref)
     }
 
-    pub fn backward(&mut self, inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>> {
-	((*self).backward)(inputs)
+    pub fn backward(&mut self,
+		    inputs: &Vec<Rc<RefCell<Tensor<T>>>>,
+		    grad:  Rc<RefCell<Tensor<T>>>) -> Vec<Tensor<T>> {
+	let inputs_holder:Vec<Ref<'_,Tensor<T>>> = inputs.iter().map(|i| { i.borrow() }).collect();
+	let inputs_ref:Vec<&Tensor<T>> = inputs_holder.iter().map(|h| { h.deref() }).collect();
+	((*self).backward)(&inputs_ref, grad.borrow().deref())
     }
 
 
     pub fn square() -> Synapse<T> {
 	Synapse {
 	    forward: |inputs| { inputs.iter().map(|i| i.square()).collect() },
-	    backward: |inputs| { vec!() }
+	    backward: |inputs, grad| { inputs.iter().map(|i| i.scale( num::FromPrimitive::from_f64(2.0).unwrap() ).scale(grad[vec![0,0]])).collect() }
 	}
     }
 
     pub fn exp() -> Synapse<T> {
 	Synapse {
 	    forward: |inputs| { inputs.iter().map(|i| i.exp()).collect() },
-	    backward: |inputs| { vec!() }
+	    backward: |inputs,grad| { inputs.iter().map(|i| i.exp().scale(grad[vec![0,0]])).collect() }
 	}
     }
 }
@@ -94,35 +98,35 @@ where T:num::Float + Clone {
 struct SynapseNode<T>
 where T:num::Float + Clone {
     name: String,
+    synapse: Synapse<T>,
     generation: usize,
     inputs: Vec<Rc<RefCell<Neuron<T>>>>,
     outputs: Vec<Rc<RefCell<Neuron<T>>>>,
-    synapse: Synapse<T>
 }
 
 impl<T> SynapseNode<T>
-where T:num::Float + Clone {
+where T:num::Float + num::FromPrimitive + Clone {
 
     pub fn new(prev:Option<Rc<RefCell<SynapseNode<T>>>>,
 	       name: &str,
 	       inputs: Vec<Rc<RefCell<Neuron<T>>>>,
 	       outputs: Vec<Rc<RefCell<Neuron<T>>>>,
 	       forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-	       backward: fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>) -> SynapseNode<T> {
+	       backward: fn (inputs: &Vec<&Tensor<T>>,grad:&Tensor<T>) -> Vec<Tensor<T>>) -> SynapseNode<T> {
 
 	let s = Synapse::<T>::new(forward, backward);
 	let mut generation:usize = 0;
 
-	if let Some(p) = prev {
-	    generation = p.borrow().generation() + 1;
+	if let Some(ref pn) = prev {
+	    generation = pn.borrow().generation() + 1;
 	}
 
 	SynapseNode {
 	    name: name.to_string(),
+	    synapse :s,
 	    generation,
 	    inputs,
-	    outputs,
-	    synapse :s
+	    outputs
 	}
     }
 
@@ -133,16 +137,16 @@ where T:num::Float + Clone {
 			synapse: Synapse<T> ) -> SynapseNode<T> {
 	let mut generation:usize = 0;
 
-	if let Some(p) = prev {
-	    generation = p.borrow().generation() + 1;
+	if let Some(ref pn) = prev {
+	    generation = pn.borrow().generation() + 1;
 	}
 
 	SynapseNode {
 	    name: name.to_string(),
+	    synapse,
 	    generation,
 	    inputs,
-	    outputs,
-	    synapse
+	    outputs
 	}
     }
 
@@ -163,12 +167,28 @@ where T:num::Float + Clone {
     }
 
     pub fn backward_prop(&mut self) -> () {
-	
+	let grads:Vec<Rc<RefCell<Tensor<T>>>> =
+	    self.outputs.iter().map(|output| {
+		if None == output.borrow_mut().grad {
+		    output.borrow_mut().grad = Some(Rc::new(RefCell::new(Tensor::<T>::one(&[1,1]))));
+		}
+		if let Some(ref grad) = output.borrow_mut().grad {
+		    return Rc::clone(grad);
+		}
+		else {
+		    panic!();
+		}
+	    }).collect();
+	let input_tensors = self.inputs.iter().map(|n| n.borrow().get_signal()).collect();
+	let outputs = self.synapse.backward(&input_tensors, Rc::clone(&grads[0]));
+	for (input, output) in self.inputs.iter().zip(outputs.into_iter()) {
+	    input.borrow_mut().grad = Some(Rc::new(RefCell::new(output.to_owned())));
+	}
     }
 }
 
 struct NeuralNetwork<T>
-where T:num::Float + Clone {
+where T:num::Float + num::FromPrimitive + Clone {
     neurons:  HashMap<String, Rc<RefCell<Neuron<T>>>>,
     synapse_nodes: HashMap<String, Rc<RefCell<SynapseNode<T>>>>,
     input_neurons: Vec<Rc<RefCell<Neuron<T>>>>,
@@ -176,7 +196,7 @@ where T:num::Float + Clone {
 }
 
 impl<T> NeuralNetwork<T>
-where T:num::Float + Clone {
+where T:num::Float + num::FromPrimitive + Clone {
 
     pub fn new() -> NeuralNetwork<T> {
 	NeuralNetwork {
@@ -208,7 +228,7 @@ where T:num::Float + Clone {
 			  inputs: Vec<&str>,
 			  outputs: Vec<&str>,
 			  forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-			  backward: fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>) {
+			  backward: fn (inputs: &Vec<&Tensor<T>>, grad:&Tensor<T>) -> Vec<Tensor<T>>) {
 	let input_neurons:Vec<Rc<RefCell<Neuron<T>>>> =
 	    inputs.iter().map(|label| Rc::clone(&self.neurons[*label])).collect();
 	let output_neurons:Vec<Rc<RefCell<Neuron<T>>>> =
@@ -306,8 +326,8 @@ mod tests {
 			  | inputs | -> Vec<Tensor<f32>> {
 			      vec![inputs[0] + inputs[1]]
 			  },
-			  | inputs | -> Vec<Tensor<f32>> {
-			      vec!()
+			  | _inputs, grad | -> Vec<Tensor<f32>> {
+			      vec![grad.clone(),grad.clone()]
 			  });
 
 	nn.forward_prop(vec![n1,n2]);
@@ -332,7 +352,7 @@ mod tests {
 	nn.forward_prop(vec![n1]);
 	println!("n4 {:?}", nn.ref_neuron("n4"));
 	nn.backward_prop();
-
+	println!("n1 {:?}", nn.ref_neuron("n1"));
     }
 
 }
