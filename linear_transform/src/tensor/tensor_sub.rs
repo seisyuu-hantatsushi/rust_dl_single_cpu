@@ -46,16 +46,16 @@ impl<T> ops::Sub<&Tensor<T>> for Tensor<T>
     }
 }
 
-/* T = &T + &T */
+/* T = &T - &T */
 impl<T> ops::Sub for &Tensor<T>
-   where T:num::Num + Copy
+   where T:num::Num + Copy + std::fmt::Debug
 {
     type Output = Tensor<T>;
     fn sub(self, other: Self) -> Self::Output {
 	assert_eq!(self.shape(),other.shape());
 	let lhs:&[T] = self.buffer();
 	let rhs:&[T] = other.buffer();
-	let v = lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| (*lhs) - (*rhs)).collect::<Vec<T>>();
+	let v = lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| {*lhs - *rhs}).collect::<Vec<T>>();
 	Tensor::from_vector(self.shape().to_vec(), v)
     }
 }

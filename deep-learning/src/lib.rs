@@ -5,7 +5,7 @@ pub mod gradient;
 pub mod loader;
 pub mod neural_network;
 
-#[cfg(test)]
+#[cfg(_test)]
 mod tests {
     use super::*;
     use std::f32;
