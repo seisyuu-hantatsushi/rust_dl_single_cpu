@@ -1,4 +1,4 @@
-use std::{fmt,ops};
+use std::fmt;
 use std::ops::Deref;
 use std::cell::{Ref,RefCell};
 use std::rc::Rc;
@@ -6,159 +6,8 @@ use std::collections::HashMap;
 use linear_transform::tensor::tensor_base::Tensor;
 use num;
 
-#[derive(Debug, Clone)]
-struct Neuron<T>
-where T:num::Float + Clone {
-    name: String,
-    signal: Rc<RefCell<Tensor<T>>>,
-    grad: Option<Rc<RefCell<Tensor<T>>>>
-}
-
-impl<T> fmt::Display for Neuron<T>
-where T: fmt::Display + Clone + num::Float {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-	let mut disp = format!("Neuron. name:{}\n",self.name);
-	disp = format!("{}{}", disp, self.signal.borrow());
-	write!(f,"{}",disp)
-    }
-}
-
-impl<T> Neuron<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
-
-    pub fn create(name:&str, init_signal:Tensor<T>) -> Neuron<T> {
-	Neuron {
-	    name: name.to_string(),
-	    signal: Rc::new(RefCell::new(init_signal)),
-	    grad: None,
-	}
-    }
-
-    pub fn get_signal(&self) -> Rc<RefCell<Tensor<T>>> {
-	Rc::clone(&self.signal)
-    }
-
-    pub fn name(&self) -> &str {
-	&self.name
-    }
-
-    pub fn assign(&mut self, signal:Tensor<T>) -> () {
-	(*self.signal.borrow_mut()) = signal;
-    }
-
-    pub fn clear_grad(&mut self) -> () {
-	self.grad = None;
-    }
-
-    pub fn element(&self, index:Vec<usize>) -> T {
-	let v = self.signal.borrow()[index];
-	v.clone()
-    }
-
-    pub fn grad(&self) -> Option<Tensor<T>> {
-	if let Some(ref g) = self.grad {
-	    Some(g.borrow().clone())
-	}
-	else {
-	    None
-	}
-    }
-
-}
-
-
-struct Synapse<T>
-    where T:num::Float + num::pow::Pow<T, Output = T> + Clone + std::fmt::Debug {
-    forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-    backward: fn (inputs: &Vec<&Tensor<T>>,grad:&Tensor<T>) -> Vec<Tensor<T>>,
-}
-
-
-impl<T> Synapse<T>
-where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + std::fmt::Debug {
-
-    pub fn new(forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-	       backward: fn (inputs: &Vec<&Tensor<T>>,grad:&Tensor<T>) -> Vec<Tensor<T>>) -> Synapse<T> {
-	Synapse {
-	    forward,
-	    backward,
-	}
-    }
-
-    pub fn forward(&mut self,inputs: &Vec<Rc<RefCell<Tensor<T>>>>) -> Vec<Tensor<T>> {
-	let holder:Vec<Ref<'_,Tensor<T>>> = inputs.iter().map(|i| { i.borrow() }).collect();
-	let inputs_ref:Vec<&Tensor<T>> = holder.iter().map(|h| { h.deref() }).collect();
-	((*self).forward)(&inputs_ref)
-    }
-
-    pub fn backward(&mut self,
-		    inputs: &Vec<Rc<RefCell<Tensor<T>>>>,
-		    grad:  Rc<RefCell<Tensor<T>>>) -> Vec<Tensor<T>> {
-	let inputs_holder:Vec<Ref<'_,Tensor<T>>> = inputs.iter().map(|i| { i.borrow() }).collect();
-	let inputs_ref:Vec<&Tensor<T>> = inputs_holder.iter().map(|h| { h.deref() }).collect();
-	((*self).backward)(&inputs_ref, grad.borrow().deref())
-    }
-
-    pub fn add() -> Synapse<T> {
-	Synapse {
-	    forward:  |inputs| { vec![inputs[0] + inputs[1]] },
-	    backward: |_inputs, grad| { vec![grad.clone(), grad.clone()] }
-	}
-    }
-
-    pub fn neg() -> Synapse<T> {
-	Synapse {
-	    forward:  |inputs| { vec![inputs[0].neg()] },
-	    backward: |_inputs, grad| { vec![grad.neg()] }
-	}
-    }
-
-    pub fn sub() -> Synapse<T> {
-	Synapse {
-	    forward:  |inputs| { vec![inputs[0] - inputs[1]] },
-	    backward: |_inputs, grad| { vec![grad.clone(), grad.neg()] }
-	}
-    }
-
-    pub fn mul() -> Synapse<T> {
-	Synapse {
-	    forward: |inputs| {
-		vec![Tensor::<T>::mul_rank0(inputs[0], inputs[1])]
-	    },
-	    backward: |inputs, grad| { vec![ Tensor::<T>::mul_rank0(inputs[1],grad),
-					     Tensor::<T>::mul_rank0(inputs[0],grad) ] }
-	}
-    }
-
-    pub fn div() -> Synapse<T> {
-	Synapse {
-	    forward: |inputs| {
-		vec![Tensor::<T>::div_rank0(inputs[0], inputs[1])]
-	    },
-	    backward: |inputs, grad| {
-		let two = num::FromPrimitive::from_f64(2.0).unwrap();
-		let gl = Tensor::<T>::div_rank0(grad,inputs[0]);
-		let gr = Tensor::<T>::mul_rank0(grad, &Tensor::<T>::div_rank0(&inputs[0].neg(), &inputs[1].pow_rank0(two)));
-		vec![ gl, gr ]
-	    }
-	}
-    }
-
-    pub fn square() -> Synapse<T> {
-	Synapse {
-	    forward:  |inputs| { inputs.iter().map(|i| i.square()).collect() },
-	    backward: |inputs, grad| { inputs.iter().map(|i| i.scale( num::FromPrimitive::from_f64(2.0).unwrap() ).scale(grad[vec![0,0]])).collect() }
-	}
-    }
-
-    pub fn exp() -> Synapse<T> {
-	Synapse {
-	    forward:  |inputs| { inputs.iter().map(|i| i.exp()).collect() },
-	    backward: |inputs,grad| { inputs.iter().map(|i| i.exp().scale(grad[vec![0,0]])).collect() }
-	}
-    }
-
-}
+use crate::neuron::Neuron;
+use crate::synapse::Synapse;
 
 struct SynapseNode<T>
 where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + std::fmt::Debug {
@@ -250,11 +99,11 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
     pub fn backward_prop(&mut self) -> () {
 	let grads:Vec<Rc<RefCell<Tensor<T>>>> =
 	    self.outputs.iter().map(|output| {
-		if None == output.borrow_mut().grad {
-		    output.borrow_mut().grad = Some(Rc::new(RefCell::new(Tensor::<T>::one(&[1,1]))));
+		if None == output.borrow_mut().grad() {
+		    output.borrow_mut().set_grad(Rc::new(RefCell::new(Tensor::<T>::one(&[1,1]))));
 		}
-		if let Some(ref grad) = output.borrow_mut().grad {
-		    return Rc::clone(grad);
+		if let Some(grad) = output.borrow_mut().grad() {
+		    return Rc::new(RefCell::new(grad));
 		}
 		else {
 		    panic!();
@@ -263,14 +112,14 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	let input_tensors = self.inputs.iter().map(|n| n.borrow().get_signal()).collect();
 	let outputs = self.synapse.backward(&input_tensors, Rc::clone(&grads[0]));
 	for (input, output) in self.inputs.iter().zip(outputs.into_iter()) {
-	    let grad:Option<Rc<RefCell<Tensor<T>>>> = if let Some(ref g) = input.borrow().grad {
-		let grad = g.borrow().deref() + output;
-		Some(Rc::new(RefCell::new(grad)))
+	    let grad:Rc<RefCell<Tensor<T>>> = if let Some(g) = input.borrow().grad() {
+		let grad = g + output;
+		Rc::new(RefCell::new(grad))
 	    }
 	    else {
-		Some(Rc::new(RefCell::new(output.to_owned())))
+		Rc::new(RefCell::new(output.to_owned()))
 	    };
-	    input.borrow_mut().grad = grad;
+	    input.borrow_mut().set_grad(grad);
 	}
     }
 }
@@ -428,6 +277,9 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	    n.borrow_mut().clear_grad()
 	}
     }
+
+    
+
 }
 
 #[cfg(test)]

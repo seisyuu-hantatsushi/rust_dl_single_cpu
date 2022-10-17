@@ -4,6 +4,8 @@ pub mod loss_functions;
 pub mod gradient;
 pub mod loader;
 pub mod neural_network;
+pub mod neuron;
+pub mod synapse;
 
 #[cfg(_test)]
 mod tests {
