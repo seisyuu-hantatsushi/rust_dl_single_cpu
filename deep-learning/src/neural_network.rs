@@ -649,6 +649,149 @@ mod tests {
 	assert_eq!(nn.ref_neuron("z").borrow().element(vec![0,0]), 0.52-0.48);
     }
 
+
+    #[test]
+    fn nn_test_backprop_1(){
+	let mut nn = NeuralNetwork::<f64>::new();
+
+	nn.create_neuron("x",true);
+	nn.create_neuron("y",true);
+
+	nn.add_neuron(Neuron::<f64>::create("2",  Tensor::<f64>::from_array(&[1,1], &[2.0])));
+	nn.add_neuron(Neuron::<f64>::create("3",  Tensor::<f64>::from_array(&[1,1], &[3.0])));
+
+	nn.add_synapse(vec!(),            "2*x",         vec!["2","x"],      vec!["2*x"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),            "3*y",         vec!["3","y"],      vec!["3*y"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x","3*y"], "z",           vec!["2*x","3*y"],  vec!["z"],       Synapse::<f64>::sub());
+
+	let x = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	let y = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	nn.forward_prop(vec![x,y]);
+	nn.backward_prop(false);
+
+	println!("{:?}", nn.ref_neuron("x"));
+	println!("{:?}", nn.ref_neuron("y"));
+	println!("{:?}", nn.ref_neuron("z"));
+
+	fn z(x:f64, y:f64) -> f64 {
+	    2.0*x - 3.0*y
+	}
+	println!("{}",z(1.0,1.0));
+	println!("{}",(z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4));
+	println!("{}",(z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4));
+    }
+
+    #[test]
+    fn nn_test_backprop_2(){
+	let mut nn = NeuralNetwork::<f64>::new();
+
+	nn.create_neuron("x",true);
+	nn.create_neuron("y",true);
+
+	nn.add_neuron(Neuron::<f64>::create("2",  Tensor::<f64>::from_array(&[1,1], &[2.0])));
+	nn.add_neuron(Neuron::<f64>::create("3",  Tensor::<f64>::from_array(&[1,1], &[3.0])));
+	nn.add_neuron(Neuron::<f64>::create("16", Tensor::<f64>::from_array(&[1,1], &[16.0])));
+
+	nn.add_synapse(vec!(),                "2*x",         vec!["2","x"],         vec!["2*x"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),                "3*y",         vec!["3","y"],         vec!["3*y"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x","3*y"],     "2*x-3*y",     vec!["2*x","3*y"],     vec!["2*x-3*y"], Synapse::<f64>::sub());
+	nn.add_synapse(vec!(),                "x*y",         vec!["x","y"],         vec!["x*y"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x-3*y","x*y"], "2*x-3*y-x*y", vec!["2*x-3*y","x*y"], vec!["z"],       Synapse::<f64>::sub());
+
+	let x = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	let y = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	nn.forward_prop(vec![x,y]);
+	nn.backward_prop(false);
+
+	println!("{:?}", nn.ref_neuron("x"));
+	println!("{:?}", nn.ref_neuron("y"));
+	println!("{:?}", nn.ref_neuron("z"));
+
+	fn z(x:f64, y:f64) -> f64 {
+	    2.0*x - 3.0*y - x*y
+	}
+	println!("z: {}",z(1.0,1.0));
+	println!("dx {}",(z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4));
+	println!("dy {}",(z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4));
+
+    }
+/*
+    #[test]
+    fn nn_test_backprop_3(){
+	let mut nn = NeuralNetwork::<f64>::new();
+
+	nn.create_neuron("x",true);
+	nn.create_neuron("y",true);
+
+	nn.add_neuron(Neuron::<f64>::create("1",  Tensor::<f64>::from_array(&[1,1], &[1.0])));
+	nn.add_neuron(Neuron::<f64>::create("2",  Tensor::<f64>::from_array(&[1,1], &[2.0])));
+	nn.add_neuron(Neuron::<f64>::create("3",  Tensor::<f64>::from_array(&[1,1], &[3.0])));
+	nn.add_neuron(Neuron::<f64>::create("16", Tensor::<f64>::from_array(&[1,1], &[16.0])));
+
+	nn.add_synapse(vec!(),                   "2*x",            vec!["2","x"],            vec!["2*x"],            Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),                   "3*y",            vec!["3","y"],            vec!["3*y"],            Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x","3*y"],        "2*x-3*y",        vec!["2*x","3*y"],        vec!["2*x-3*y"],        Synapse::<f64>::sub());
+	nn.add_synapse(vec!(),                   "x*y",            vec!["x","y"],            vec!["x*y"],            Synapse::<f64>::mul());
+	nn.add_synapse(vec!["x*y"],              "16*x*y",         vec!["16","x*y"],         vec!["16*x*y"],         Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x-3*y","16*x*y"], "2*x-3*y-16*x*y", vec!["2*x-3*y","16*x*y"], vec!["2*x-3*y-16*x*y"], Synapse::<f64>::sub());
+	nn.add_synapse(vec!["x*y"],              "1+x*y",          vec!["1","x*y"],          vec!["1+x*y"],          Synapse::<f64>::add());
+	nn.add_synapse(vec!["2*x-3*y-16*x*y","1+x*y"],
+		       "(2*x-3*y-16*x*y)*(1+x*y)", vec!["2*x-3*y-16*x*y","1+x*y"], vec!["z"], Synapse::<f64>::mul());
+
+
+	let x = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	let y = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	nn.forward_prop(vec![x,y]);
+	nn.backward_prop(false);
+
+	println!("{:?}", nn.ref_neuron("x"));
+	println!("{:?}", nn.ref_neuron("y"));
+	println!("{:?}", nn.ref_neuron("z"));
+
+	fn z(x:f64, y:f64) -> f64 {
+	    (2.0*x - 3.0*y - 16.0*x*y)*(1.0+x*y)
+	}
+	println!("z: {}",z(1.0,1.0));
+	println!("dx {}",(z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4));
+	println!("dy {}",(z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4));
+
+    }
+*/
+    #[test]
+    fn nn_test_backprop_4(){
+	let mut nn = NeuralNetwork::<f64>::new();
+
+	nn.create_neuron("x",true);
+	nn.create_neuron("y",true);
+
+	nn.add_neuron(Neuron::<f64>::create("1",  Tensor::<f64>::from_array(&[1,1], &[1.0])));
+	nn.add_neuron(Neuron::<f64>::create("2",  Tensor::<f64>::from_array(&[1,1], &[2.0])));
+	nn.add_neuron(Neuron::<f64>::create("3",  Tensor::<f64>::from_array(&[1,1], &[3.0])));
+	nn.add_neuron(Neuron::<f64>::create("16", Tensor::<f64>::from_array(&[1,1], &[16.0])));
+
+	nn.add_synapse(vec!(),                   "2*x",            vec!["2","x"],            vec!["2*x"],      Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),                   "3*y",            vec!["3","y"],            vec!["3*y"],      Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x","3*y"],        "2*x-3*y",        vec!["2*x","3*y"],        vec!["2*x-3*y"],  Synapse::<f64>::sub());
+	nn.add_synapse(vec!["2*x-3*y"],          "(2*x-3*y)^2",    vec!["2*x-3*y"],          vec!["z"],        Synapse::<f64>::square());
+
+	let x = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	let y = Tensor::<f64>::from_array(&[1,1], &[1.0]);
+	nn.forward_prop(vec![x,y]);
+	nn.backward_prop(false);
+
+	println!("backprop_4 {:?}", nn.ref_neuron("x"));
+	println!("backprop_4 {:?}", nn.ref_neuron("y"));
+	println!("backprop_4 {:?}", nn.ref_neuron("z"));
+
+	fn z(x:f64, y:f64) -> f64 {
+	    (2.0*x - 3.0*y).powf(2.0)
+	}
+	println!("backprop_4 z: {}",z(1.0,1.0));
+	println!("backprop_4 dx {}",(z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4));
+	println!("backprop_4 dy {}",(z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4));
+
+    }
+
     #[test]
     fn nn_test_goldstein(){
 	let mut nn = NeuralNetwork::<f64>::new();
@@ -662,6 +805,7 @@ mod tests {
 	nn.add_neuron(Neuron::<f64>::create("6",  Tensor::<f64>::from_array(&[1,1], &[6.0])));
 	nn.add_neuron(Neuron::<f64>::create("12", Tensor::<f64>::from_array(&[1,1], &[12.0])));
 	nn.add_neuron(Neuron::<f64>::create("14", Tensor::<f64>::from_array(&[1,1], &[14.0])));
+	nn.add_neuron(Neuron::<f64>::create("16", Tensor::<f64>::from_array(&[1,1], &[16.0])));
 	nn.add_neuron(Neuron::<f64>::create("18", Tensor::<f64>::from_array(&[1,1], &[18.0])));
 	nn.add_neuron(Neuron::<f64>::create("19", Tensor::<f64>::from_array(&[1,1], &[19.0])));
 	nn.add_neuron(Neuron::<f64>::create("27", Tensor::<f64>::from_array(&[1,1], &[27.0])));
@@ -670,22 +814,22 @@ mod tests {
 	nn.add_neuron(Neuron::<f64>::create("36", Tensor::<f64>::from_array(&[1,1], &[36.0])));
 	nn.add_neuron(Neuron::<f64>::create("48", Tensor::<f64>::from_array(&[1,1], &[48.0])));
 
-	nn.add_synapse(vec!(),        "x+y",       vec!["x","y"],     vec!["x+y"],       Synapse::<f64>::add());
-	nn.add_synapse(vec!["x+y"],   "x+y+1",     vec!["x+y","1"],   vec!["x+y+1"],     Synapse::<f64>::add());
-	nn.add_synapse(vec!["x+y+1"], "(x+y+1)^2", vec!["x+y+1"],     vec!["(x+y+1)^2"], Synapse::<f64>::square());
-	nn.add_synapse(vec!(),        "14*x",      vec!["14","x"],    vec!["14*x"],      Synapse::<f64>::mul());
-	nn.add_synapse(vec!(),        "x^2",       vec!["x"],         vec!["x^2"],       Synapse::<f64>::square());
-	nn.add_synapse(vec!(),        "14*y",      vec!["14","y"],    vec!["14*y"],      Synapse::<f64>::mul());
-	nn.add_synapse(vec!(),        "x*y",       vec!["x","y"],     vec!["x*y"],       Synapse::<f64>::mul());
-	nn.add_synapse(vec!(),        "y^2",       vec!["y"],         vec!["y^2"],       Synapse::<f64>::square());
-	nn.add_synapse(vec!["y^2"],   "3*(y^2)",   vec!["3","y^2"],   vec!["3*(y^2)"],   Synapse::<f64>::mul());
-	nn.add_synapse(vec!["x^2"],   "3*(x^2)",   vec!["3","x^2"],   vec!["3*(x^2)"],   Synapse::<f64>::mul());
-	nn.add_synapse(vec!["x*y"],   "6*x*y",     vec!["6","x*y"],   vec!["6*x*y"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),          "x+y",       vec!["x","y"],                vec!["x+y"],       Synapse::<f64>::add());
+	nn.add_synapse(vec!["x+y"],     "x+y+1",     vec!["x+y","1"],              vec!["x+y+1"],     Synapse::<f64>::add());
+	nn.add_synapse(vec!["x+y+1"],   "(x+y+1)^2", vec!["x+y+1"],                vec!["(x+y+1)^2"], Synapse::<f64>::square());
+	nn.add_synapse(vec!(),          "14*x",      vec!["14","x"],               vec!["14*x"],      Synapse::<f64>::mul());
+	nn.add_synapse(vec!["14*x"],    "19-14*x",   vec!["19","14*x"],            vec!["19-14*x"],   Synapse::<f64>::sub());
+	nn.add_synapse(vec!(),          "x^2",       vec!["x"],                    vec!["x^2"],       Synapse::<f64>::square());
+	nn.add_synapse(vec!["x^2"],     "3*(x^2)",   vec!["3","x^2"],              vec!["3*(x^2)"],   Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),          "14*y",      vec!["14","y"],               vec!["14*y"],      Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),          "x*y",       vec!["x","y"],                vec!["x*y"],       Synapse::<f64>::mul());
+	nn.add_synapse(vec!["x*y"],     "6*x*y",     vec!["6","x*y"],              vec!["6*x*y"],     Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),          "y^2",       vec!["y"],                    vec!["y^2"],       Synapse::<f64>::square());
+	nn.add_synapse(vec!["y^2"],     "3*(y^2)",   vec!["3","y^2"],              vec!["3*(y^2)"],   Synapse::<f64>::mul());
 
-	nn.add_synapse(vec!["14*x"],  "19-14*x",   vec!["19","14*x"], vec!["19-14*x"],   Synapse::<f64>::sub());
-	nn.add_synapse(vec!["19-14*x","3*(x^2)"],
+	nn.add_synapse(vec!["19-14*x", "3*(x^2)"],
 		       "19-14*x+3*(x^2)",
-		       vec!["19-14*x","3*(x^2)"],
+		       vec!["19-14*x", "3*(x^2)"],
 		       vec!["19-14*x+3*(x^2)"],
 		       Synapse::<f64>::add());
 	nn.add_synapse(vec!["19-14*x+3*(x^2)","14*y"],
@@ -693,77 +837,81 @@ mod tests {
 		       vec!["19-14*x+3*(x^2)","14*y"],
 		       vec!["19-14*x+3*(x^2)-14*y"],
 		       Synapse::<f64>::sub());
-	nn.add_synapse(vec!["19-14*x+3*(x^2)","14*y"],
-		       "19-14*x+3*(x^2)-14*y",
-		       vec!["19-14*x+3*(x^2)","14*y"],
-		       vec!["19-14*x+3*(x^2)-14*y"],
-		       Synapse::<f64>::sub());
+
 	nn.add_synapse(vec!["19-14*x+3*(x^2)-14*y","6*x*y"],
 		       "19-14*x+3*(x^2)-14*y+6*x*y",
 		       vec!["19-14*x+3*(x^2)-14*y","6*x*y"],
 		       vec!["19-14*x+3*(x^2)-14*y+6*x*y"],
 		       Synapse::<f64>::add());
+
 	nn.add_synapse(vec!["19-14*x+3*(x^2)-14*y+6*x*y","3*(y^2)"],
 		       "19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2)",
 		       vec!["19-14*x+3*(x^2)-14*y+6*x*y","3*(y^2)"],
 		       vec!["19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2)"],
 		       Synapse::<f64>::add());
-	nn.add_synapse(vec!["(x+y+1)^2","19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2)"],
-		       "(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
-		       vec!["(x+y+1)^2","19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2)"],
-		       vec!["(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
-		       Synapse::<f64>::mul());
-	nn.add_synapse(vec!["(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
-		       "1+(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
-		       vec!["1","(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
-		       vec!["1+(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
-		       Synapse::<f64>::add());
-	nn.add_synapse(vec!(),            "2*x",         vec!["2","x"],      vec!["2*x"],         Synapse::<f64>::mul());
-	nn.add_synapse(vec!(),            "3*y",         vec!["3","y"],      vec!["3*y"],         Synapse::<f64>::mul());
-	nn.add_synapse(vec!["2*x","3*y"], "2*x-3*y",     vec!["2*x","3*y"],  vec!["2*x-3*y"],     Synapse::<f64>::sub());
-	nn.add_synapse(vec!["2*x-3*y"],   "(2*x-3*y)^2", vec!["2*x-3*y"],    vec!["(2*x-3*y)^2"], Synapse::<f64>::square());
-	nn.add_synapse(vec!(),            "32*x",        vec!["32","x"],     vec!["32*x"],        Synapse::<f64>::mul());
-	nn.add_synapse(vec!["32*x"],      "18-32*x",     vec!["18","32*x"],  vec!["18-32*x"],     Synapse::<f64>::sub());
-	nn.add_synapse(vec!["x^2"],       "12*(x^2)",    vec!["12","x^2"],   vec!["12*(x^2)"],    Synapse::<f64>::mul());
-	nn.add_synapse(vec!(),            "48*y",        vec!["48","y"],     vec!["48*y"],        Synapse::<f64>::mul());
-	nn.add_synapse(vec!["x*y"],       "36*x*y",      vec!["36","x*y"],   vec!["36*x*y"],      Synapse::<f64>::mul());
-	nn.add_synapse(vec!["y^2"],       "27*(y^2)",    vec!["27","y^2"],   vec!["27*(y^2)"],    Synapse::<f64>::mul());
 
-	nn.add_synapse(vec!["32*x"],     "18-32*x",      vec!["18", "32*x"], vec!["18-32*x"], Synapse::<f64>::sub());
+	nn.add_synapse(vec!["(x+y+1)^2","19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2)"],
+		       "((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
+		       vec!["(x+y+1)^2", "19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2)"],
+		       vec!["((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
+		       Synapse::<f64>::mul());
+	nn.add_synapse(vec!["((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
+		       "1+((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
+		       vec!["1","((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
+		       vec!["1+((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))"],
+		       Synapse::<f64>::add());
+
+	nn.add_synapse(vec!(),            "2*x",         vec!["2","x"],        vec!["2*x"],         Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),            "3*y",         vec!["3","y"],        vec!["3*y"],         Synapse::<f64>::mul());
+	nn.add_synapse(vec!["2*x","3*y"], "2*x-3*y",     vec!["2*x","3*y"],    vec!["2*x-3*y"],     Synapse::<f64>::sub());
+	nn.add_synapse(vec!["2*x-3*y"],   "(2*x-3*y)^2", vec!["2*x-3*y"],      vec!["(2*x-3*y)^2"], Synapse::<f64>::square());
+	nn.add_synapse(vec!(),            "32*x",        vec!["32","x"],       vec!["32*x"],        Synapse::<f64>::mul());
+	nn.add_synapse(vec!["32*x"],      "18-32*x",     vec!["18","32*x"],    vec!["18-32*x"],     Synapse::<f64>::sub());
+	nn.add_synapse(vec!["x^2"],       "12*(x^2)",    vec!["12","x^2"],     vec!["12*(x^2)"],    Synapse::<f64>::mul());
+	nn.add_synapse(vec!(),            "48*y",        vec!["48","y"],       vec!["48*y"],        Synapse::<f64>::mul());
+	nn.add_synapse(vec!["x*y"],       "36*x*y",      vec!["36","x*y"],     vec!["36*x*y"],      Synapse::<f64>::mul());
+	nn.add_synapse(vec!["y^2"],       "27*(y^2)",    vec!["27","y^2"],     vec!["27*(y^2)"],    Synapse::<f64>::mul());
+
 	nn.add_synapse(vec!["18-32*x","12*(x^2)"],
 		       "18-32*x+12*(x^2)",
 		       vec!["18-32*x","12*(x^2)"],
 		       vec!["18-32*x+12*(x^2)"],
 		       Synapse::<f64>::add());
+
 	nn.add_synapse(vec!["18-32*x+12*(x^2)","48*y"],
 		       "18-32*x+12*(x^2)+48*y",
 		       vec!["18-32*x+12*(x^2)","48*y"],
 		       vec!["18-32*x+12*(x^2)+48*y"],
 		       Synapse::<f64>::add());
+
 	nn.add_synapse(vec!["18-32*x+12*(x^2)+48*y","36*x*y"],
 		       "18-32*x+12*(x^2)+48*y-36*x*y",
 		       vec!["18-32*x+12*(x^2)+48*y","36*x*y"],
 		       vec!["18-32*x+12*(x^2)+48*y-36*x*y"],
 		       Synapse::<f64>::sub());
+
 	nn.add_synapse(vec!["18-32*x+12*(x^2)+48*y-36*x*y","27*(y^2)"],
 		       "18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2)",
 		       vec!["18-32*x+12*(x^2)+48*y-36*x*y","27*(y^2)"],
 		       vec!["18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2)"],
 		       Synapse::<f64>::add());
-	nn.add_synapse(vec!["(2*x-3*y)^2","18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2)"],
-		       "(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))",
-		       vec!["(2*x-3*y)^2","18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2)"],
-		       vec!["(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
-		       Synapse::<f64>::mul());
-	nn.add_synapse(vec!["(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
-		       "30+(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))",
-		       vec!["30","(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
-		       vec!["30+(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
-		       Synapse::<f64>::add());
-	nn.add_synapse(vec!["1+(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
+
+	nn.add_synapse( vec!["(2*x-3*y)^2","18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2)"],
+			"(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))",
+			vec!["(2*x-3*y)^2","18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2)"],
+			vec!["(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
+			Synapse::<f64>::mul());
+
+	nn.add_synapse( vec!["(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
+			"30+(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))",
+			vec!["30","(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
+			vec!["30+(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
+			Synapse::<f64>::add());
+
+	nn.add_synapse(vec!["1+((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
 			    "30+(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
 		       "z",
-		       vec!["1+(x+y+1)^2*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
+		       vec!["1+((x+y+1)^2)*(19-14*x+3*(x^2)-14*y+6*x*y+3*(y^2))",
 			    "30+(2*x-3*y)^2*(18-32*x+12*(x^2)+48*y-36*x*y+27*(y^2))"],
 		       vec!["z"],
 		       Synapse::<f64>::mul());
@@ -773,18 +921,37 @@ mod tests {
 	nn.forward_prop(vec![x,y]);
 	nn.backward_prop(false);
 
-	println!("{:?}", nn.ref_neuron("x"));
-	println!("{:?}", nn.ref_neuron("y"));
-	println!("{:?}", nn.ref_neuron("z"));
+	//println!("backprop_5 {:?}", nn.ref_neuron("x"));
+	//println!("backprop_5 {:?}", nn.ref_neuron("y"));
+	//println!("backprop_5 {:?}", nn.ref_neuron("z"));
 
 	fn z(x:f64, y:f64) -> f64 {
-	    (1.0 + (x+y+1.0).powf(2.0) * (19.0-14.0*x+3.0*x.powf(2.0)-14.0*y + 6.0*x*y + 3.0*y.powf(2.0)))*
-		(30.0 + (2.0*x - 3.0*y).powf(2.0)*(18.0-32.0*x+12.0*x.powf(2.0) + 48.0*y - 36.0*x*y + 27.0*y.powf(2.0)))
+	    (1.0+ ((x+y+1.0).powf(2.0))*(19.0 - 14.0*x + 3.0*x.powf(2.0) - 14.0*y + 6.0*x*y + 3.0*y.powf(2.0))) *
+		(30.0+(2.0*x-3.0*y).powf(2.0)*(18.0 - 32.0*x + 12.0*x.powf(2.0) + 48.0*y - 36.0*x*y + 27.0*y.powf(2.0)))
 	}
-	println!("{}",z(1.0,1.0));
-	println!("{}",(z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4));
-	println!("{}",(z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4));
-    }
 
+	//println!("backprop_5 z: {}",z(1.0,1.0));
+	//println!("backprop_5 dx {}",(z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4));
+	//println!("backprop_5 dy {}",(z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4));
+
+	assert_eq!(z(1.0,1.0), nn.ref_neuron("z").borrow().element(vec![0,0]));
+
+	if let Some(g) = nn.ref_neuron("x").borrow().grad() {
+	    let diff = ((z(1.0+1.0e-4,1.0) - z(1.0-1.0e-4,1.0))/(2.0e-4) - g[vec![0,0]]).abs();
+	    assert!(diff < 1e-3);
+	}
+	else {
+	    assert!(false);
+	};
+
+	if let Some(g) = nn.ref_neuron("y").borrow().grad() {
+	    let diff = ((z(1.0,1.0+1.0e-4) - z(1.0,1.0-1.0e-4))/(2.0e-4) - g[vec![0,0]]).abs();
+	    assert!(diff < 1e-3);
+	}
+	else {
+	    assert!(false);
+	};
+
+    }
 }
 
