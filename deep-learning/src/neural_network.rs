@@ -1,4 +1,5 @@
-use std::fmt;
+use std::{fmt,fs,ptr};
+use std::io::Write;
 use std::ops::Deref;
 use std::cell::{Ref,RefCell};
 use std::rc::Rc;
@@ -6,11 +7,14 @@ use std::collections::HashMap;
 use linear_transform::tensor::tensor_base::Tensor;
 use num;
 
+use openssl::sha::sha512;
+
 use crate::neuron::Neuron;
 use crate::synapse::Synapse;
 
 struct SynapseNode<T>
 where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + std::fmt::Debug {
+    hashed_id: [u8;64],
     name: String,
     synapse: Synapse<T>,
     generation: usize,
@@ -48,6 +52,7 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	});
 
 	SynapseNode {
+	    hashed_id: sha512(name.as_bytes()),
 	    name: name.to_string(),
 	    synapse :s,
 	    generation,
@@ -72,6 +77,7 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	});
 
 	SynapseNode {
+	    hashed_id: sha512(("synapse_node".to_string() + name).as_bytes()),
 	    name: name.to_string(),
 	    synapse,
 	    generation,
@@ -88,6 +94,18 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	&self.name
     }
 
+    pub fn id(&self) -> &[u8] {
+	&self.hashed_id
+    }
+
+    pub fn inputs(&self) -> &Vec<Rc<RefCell<Neuron<T>>>> {
+	&self.inputs
+    }
+
+    pub fn outputs(&self) -> &Vec<Rc<RefCell<Neuron<T>>>> {
+	&self.outputs
+    }
+    
     pub fn forward_prop(&mut self) -> () {
 	let inputs:Vec<Rc<RefCell<Tensor<T>>>> = self.inputs.iter().map(|n| n.borrow().get_signal()).collect();
 	let outputs = self.synapse.forward(&inputs);
@@ -278,8 +296,57 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	}
     }
 
-    
+    pub fn gen_dot_graph(&mut self, file: &str) -> (){
+	let mut output = "digraph g {\n".to_string();
+	for n in self.neurons.values() {
+	    let nref = n.borrow();
+	    let id_ref = nref.id();
+	    let mut id:[u8;16] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+	    unsafe {
+		std::ptr::copy(id_ref.as_ptr(), id.as_mut_ptr(), 16);
+	    }
+	    let id_u128 = u128::from_be_bytes(id);
+	    output = output.to_string() + &id_u128.to_string() + " [label=\"" + nref.name() + "\", color=orange, style=filled]" + "\n";
+	}
+	for sn in self.synapse_nodes.values() {
+	    let sn_ref = sn.borrow();
+	    let id_ref = sn_ref.id();
+	    let name = sn_ref.name();
+	    let mut id:[u8;16] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+	    unsafe {
+		std::ptr::copy(id_ref.as_ptr(), id.as_mut_ptr(), 16);
+	    }
+	    let id_u128 = u128::from_be_bytes(id);
+	    output = output.to_string() + &id_u128.to_string() + " [label=\"" + name + "\", color=lightblue, style=filled, shape=box ]" + "\n";
+	    for ni in sn_ref.inputs().iter() {
+		let ni_ref = ni.borrow();
+		let niid_ref = ni_ref.id();
+		let mut niid:[u8;16] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+		unsafe {
+		    std::ptr::copy(niid_ref.as_ptr(), niid.as_mut_ptr(), 16);
+		}
+		let niid_u128 = u128::from_be_bytes(niid);
+		output = output.to_string() + &niid_u128.to_string() + "->" + &id_u128.to_string() + "\n"
+	    }
 
+	    for no in sn_ref.outputs().iter() {
+		let no_ref = no.borrow();
+		let noid_ref = no_ref.id();
+		let mut noid:[u8;16] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+		unsafe {
+		    std::ptr::copy(noid_ref.as_ptr(), noid.as_mut_ptr(), 16);
+		}
+		let noid_u128 = u128::from_be_bytes(noid);
+		output = output.to_string() + &id_u128.to_string() + "->" + &noid_u128.to_string() + "\n"
+	    }
+	}
+	
+	output = output + "}";
+	let mut ofs = fs::File::create(file).unwrap();
+	ofs.write_all(output.as_bytes());
+	
+    }
+    
 }
 
 #[cfg(test)]
@@ -307,7 +374,7 @@ mod tests {
 
 	nn.forward_prop(vec![n1,n2]);
 
-	println!("n3 {:?}", nn.ref_neuron("n3"));
+	println!("n3 {}", nn.ref_neuron("n3").borrow());
     }
 
     #[test]
@@ -326,9 +393,9 @@ mod tests {
 	nn.add_synapse(vec!["exp1"],    "square2", vec!["n3"], vec!["n4"], Synapse::<f32>::square());
 
 	nn.forward_prop(vec![n1]);
-	println!("n4 {:?}", nn.ref_neuron("n4"));
+	println!("n4 {}", nn.ref_neuron("n4").borrow());
 	nn.backward_prop(true);
-	println!("n1 {:?}", nn.ref_neuron("n1"));
+	println!("n1 {}", nn.ref_neuron("n1").borrow());
     }
 
     #[test]
@@ -342,12 +409,12 @@ mod tests {
 	nn.add_synapse(vec!(), "add1", vec!["n1","n1"], vec!["n2"], Synapse::<f32>::add());
 
 	nn.forward_prop(vec![n1]);
-	println!("add_link n2 {:?}", nn.ref_neuron("n2"));
+	println!("add_link n2 {}", nn.ref_neuron("n2").borrow());
 	nn.backward_prop(true);
-	println!("add_link n1 {:?}", nn.ref_neuron("n1"));
+	println!("add_link n1 {}", nn.ref_neuron("n1").borrow());
 
 	let n1 = Tensor::<f32>::from_array(&[1,1], &[3.0]);
-	println!("{:?}", n1.neg());
+	println!("{}", n1.neg());
     }
 
     #[test]
@@ -366,9 +433,9 @@ mod tests {
 
 	nn.forward_prop(vec![x,y]);
 	nn.backward_prop(false);
-	println!("test_sqaure z {:?}", nn.ref_neuron("z"));
-	println!("test_sqaure x {:?}", nn.ref_neuron("x"));
-	println!("test_sqaure y {:?}", nn.ref_neuron("y"));
+	println!("test_sqaure z {}", nn.ref_neuron("z").borrow());
+	println!("test_sqaure x {}", nn.ref_neuron("x").borrow());
+	println!("test_sqaure y {}", nn.ref_neuron("y").borrow());
 
     }
 
@@ -390,15 +457,15 @@ mod tests {
 
 	nn.forward_prop(vec![x]);
 	nn.backward_prop(true);
-	println!("add_square_link y {:?}", nn.ref_neuron("y"));
-	println!("add_square_link x {:?}", nn.ref_neuron("x"));
+	println!("add_square_link y {}", nn.ref_neuron("y").borrow());
+	println!("add_square_link x {}", nn.ref_neuron("x").borrow());
 	nn.clear_grad();
 
 	let x = Tensor::<f32>::from_array(&[1,1], &[2.0]);
 	nn.forward_prop(vec![x]);
 	nn.backward_prop(false);
-	println!("add_square_link y {:?}", nn.ref_neuron("y"));
-	println!("add_square_link x {:?}", nn.ref_neuron("x"));
+	println!("add_square_link y {}", nn.ref_neuron("y").borrow());
+	println!("add_square_link x {}", nn.ref_neuron("x").borrow());
     }
 
     #[test]
@@ -475,12 +542,12 @@ mod tests {
 	nn.forward_prop(vec![x,y]);
 	nn.backward_prop(false);
 
-	println!("test_matyas x {:?}", nn.ref_neuron("x"));
-	println!("test_matyas y {:?}", nn.ref_neuron("y"));
+	println!("test_matyas x {}", nn.ref_neuron("x").borrow());
+	println!("test_matyas y {}", nn.ref_neuron("y").borrow());
 	//println!("test_matyas c1_add_square {:?}", nn.ref_neuron("c1_add_square"));
 	//println!("test_matyas c2_mul_x_y {:?}", nn.ref_neuron("c2_mul_x_y"));
 	//println!("test_matyas z {}", nn.ref_synapse_node("z").borrow());
-	println!("test_matyas z {:?}", nn.ref_neuron("z"));
+	println!("test_matyas z {}", nn.ref_neuron("z").borrow());
 
 	assert_eq!(nn.ref_neuron("z").borrow().element(vec![0,0]), 0.52-0.48);
 
@@ -499,6 +566,7 @@ mod tests {
 	}
 
 	assert_eq!(nn.ref_neuron("z").borrow().element(vec![0,0]), 0.52-0.48);
+	nn.gen_dot_graph("matyas_graph.dot");
     }
 
 
@@ -521,9 +589,9 @@ mod tests {
 	nn.forward_prop(vec![x,y]);
 	nn.backward_prop(false);
 
-	println!("{:?}", nn.ref_neuron("x"));
-	println!("{:?}", nn.ref_neuron("y"));
-	println!("{:?}", nn.ref_neuron("z"));
+	println!("{}", nn.ref_neuron("x").borrow());
+	println!("{}", nn.ref_neuron("y").borrow());
+	println!("{}", nn.ref_neuron("z").borrow());
 
 	fn z(x:f64, y:f64) -> f64 {
 	    2.0*x - 3.0*y
@@ -555,9 +623,9 @@ mod tests {
 	nn.forward_prop(vec![x,y]);
 	nn.backward_prop(false);
 
-	println!("{:?}", nn.ref_neuron("x"));
-	println!("{:?}", nn.ref_neuron("y"));
-	println!("{:?}", nn.ref_neuron("z"));
+	println!("{}", nn.ref_neuron("x").borrow());
+	println!("{}", nn.ref_neuron("y").borrow());
+	println!("{}", nn.ref_neuron("z").borrow());
 
 	fn z(x:f64, y:f64) -> f64 {
 	    2.0*x - 3.0*y - x*y
@@ -631,9 +699,9 @@ mod tests {
 	nn.forward_prop(vec![x,y]);
 	nn.backward_prop(false);
 
-	println!("backprop_4 {:?}", nn.ref_neuron("x"));
-	println!("backprop_4 {:?}", nn.ref_neuron("y"));
-	println!("backprop_4 {:?}", nn.ref_neuron("z"));
+	println!("backprop_4 {}", nn.ref_neuron("x").borrow());
+	println!("backprop_4 {}", nn.ref_neuron("y").borrow());
+	println!("backprop_4 {}", nn.ref_neuron("z").borrow());
 
 	fn z(x:f64, y:f64) -> f64 {
 	    (2.0*x - 3.0*y).powf(2.0)
@@ -804,6 +872,8 @@ mod tests {
 	    assert!(false);
 	};
 
+
+	nn.gen_dot_graph("gs_graph.dot");
     }
 }
 
