@@ -93,4 +93,20 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	}
     }
 
+    pub fn pow() -> Synapse<T> {
+	Synapse {
+	    forward: |inputs| {
+		// first index is base
+		// second index is exp
+		vec![inputs[0].pow_rank0(inputs[1][vec![0,0]])]
+	    },
+	    backward: |inputs,grad| {
+		let dinput_0 = inputs[0].pow_rank0(inputs[1][vec![0,0]]-num::one())
+		    .scale(inputs[1][vec![0,0]])
+		    .scale(grad[vec![0,0]]);
+		let dinput_1 = inputs[0].pow_rank0(inputs[1][vec![0,0]]).scale(inputs[0][vec![0,0]].ln());
+		vec![dinput_0,dinput_1]
+	    }
+	}
+    }
 }

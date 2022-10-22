@@ -105,7 +105,7 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
     pub fn outputs(&self) -> &Vec<Rc<RefCell<Neuron<T>>>> {
 	&self.outputs
     }
-    
+
     pub fn forward_prop(&mut self) -> () {
 	let inputs:Vec<Rc<RefCell<Tensor<T>>>> = self.inputs.iter().map(|n| n.borrow().get_signal()).collect();
 	let outputs = self.synapse.forward(&inputs);
@@ -162,12 +162,13 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	}
     }
 
-    pub fn create_neuron(&mut self, name:&str, input: bool) {
+    pub fn create_neuron(&mut self, name:&str, input: bool) -> Rc<RefCell<Neuron<T>>> {
 	let n = Rc::new(RefCell::new(Neuron::<T>::create(name, Tensor::<T>::zero(&[1,1]))));
 	self.neurons.insert(name.to_string(), Rc::clone(&n));
 	if input {
 	    self.input_neurons.push(Rc::clone(&n))
 	}
+	n
     }
 
     pub fn add_neuron(&mut self, n:Neuron<T>) -> Rc<RefCell<Neuron<T>>> {
@@ -203,7 +204,8 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	    self.generation_table.resize(g+1, Vec::new());
 	}
 	self.generation_table[g].push(Rc::clone(&rsn));
-	self.synapse_nodes.insert(name.to_string(), rsn);
+	self.synapse_nodes.insert(name.to_string(), Rc::clone(&rsn));
+	rsn.borrow_mut().forward_prop();
     }
 
     pub fn add_synapse(&mut self,
@@ -247,7 +249,9 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	    self.generation_table.resize(g+1, Vec::new());
 	}
 	self.generation_table[g].push(Rc::clone(&rsn));
-	self.synapse_nodes.insert(name.to_string(), rsn);
+	self.synapse_nodes.insert(name.to_string(), Rc::clone(&rsn));
+
+	rsn.borrow_mut().forward_prop();
     }
 
     pub fn ref_neuron(&self, name:&str) -> &Rc<RefCell<Neuron<T>>> {
@@ -340,13 +344,13 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 		output = output.to_string() + &id_u128.to_string() + "->" + &noid_u128.to_string() + "\n"
 	    }
 	}
-	
+
 	output = output + "}";
 	let mut ofs = fs::File::create(file).unwrap();
 	ofs.write_all(output.as_bytes());
-	
+
     }
-    
+
 }
 
 #[cfg(test)]
@@ -725,7 +729,6 @@ mod tests {
 	nn.add_neuron(Neuron::<f64>::create("6",  Tensor::<f64>::from_array(&[1,1], &[6.0])));
 	nn.add_neuron(Neuron::<f64>::create("12", Tensor::<f64>::from_array(&[1,1], &[12.0])));
 	nn.add_neuron(Neuron::<f64>::create("14", Tensor::<f64>::from_array(&[1,1], &[14.0])));
-	nn.add_neuron(Neuron::<f64>::create("16", Tensor::<f64>::from_array(&[1,1], &[16.0])));
 	nn.add_neuron(Neuron::<f64>::create("18", Tensor::<f64>::from_array(&[1,1], &[18.0])));
 	nn.add_neuron(Neuron::<f64>::create("19", Tensor::<f64>::from_array(&[1,1], &[19.0])));
 	nn.add_neuron(Neuron::<f64>::create("27", Tensor::<f64>::from_array(&[1,1], &[27.0])));
@@ -872,8 +875,124 @@ mod tests {
 	    assert!(false);
 	};
 
-
 	nn.gen_dot_graph("gs_graph.dot");
+    }
+
+    #[test]
+    fn nn_test_pow(){
+	let mut nn = NeuralNetwork::<f64>::new();
+
+	nn.create_neuron("x",true);
+	nn.create_neuron("y",true);
+
+	nn.add_neuron(Neuron::<f64>::create("2",  Tensor::<f64>::from_array(&[1,1], &[2.0])));
+	nn.add_neuron(Neuron::<f64>::create("3",  Tensor::<f64>::from_array(&[1,1], &[3.0])));
+	nn.add_neuron(Neuron::<f64>::create("6",  Tensor::<f64>::from_array(&[1,1], &[6.0])));
+	nn.add_neuron(Neuron::<f64>::create("12", Tensor::<f64>::from_array(&[1,1], &[12.0])));
+
+	nn.add_synapse(vec!(), "x^2", vec!["x","2"],  vec!["x^2"], Synapse::<f64>::pow());
+	nn.add_synapse(vec!(), "y^3", vec!["y","3"],  vec!["y^3"], Synapse::<f64>::pow());
+	nn.add_synapse(vec!["x^2"], "12*(x^2)", vec!["12","x^2"], vec!["12*(x^2)"], Synapse::<f64>::mul());
+	nn.add_synapse(vec!["y^3"], "6*(y^3)",  vec!["6", "y^3"], vec!["6*(y^3)"],  Synapse::<f64>::mul());
+	nn.add_synapse(vec!["12*(x^2)","6*(y^3)"], "z", vec!["12*(x^2)", "6*(y^3)"], vec!["z"],  Synapse::<f64>::add());
+
+	let x = Tensor::<f64>::from_array(&[1,1], &[2.0]);
+	let y = Tensor::<f64>::from_array(&[1,1], &[2.0]);
+
+	nn.forward_prop(vec![x,y]);
+	nn.backward_prop(false);
+
+	println!("nn_test_pow {}", nn.ref_neuron("x").borrow());
+	println!("nn_test_pow {}", nn.ref_neuron("y").borrow());
+	println!("nn_test_pow {}", nn.ref_neuron("z").borrow());
+
+	fn z(x:f64, y:f64) -> f64 {
+	    12.0*x.powf(2.0) + 6.0*y.powf(3.0)
+	}
+
+	assert_eq!(z(2.0,2.0), nn.ref_neuron("z").borrow().element(vec![0,0]));
+
+	if let Some(g) = nn.ref_neuron("x").borrow().grad() {
+	    let diff = ((z(2.0+1.0e-4,2.0) - z(2.0-1.0e-4,2.0))/(2.0e-4) - g[vec![0,0]]).abs();
+	    assert!(diff < 1e-3);
+	}
+	else {
+	    assert!(false);
+	};
+
+	if let Some(g) = nn.ref_neuron("y").borrow().grad() {
+	    let diff = ((z(2.0,2.0+1.0e-4) - z(2.0,2.0-1.0e-4))/(2.0e-4) - g[vec![0,0]]).abs();
+	    assert!(diff < 1e-3);
+	}
+	else {
+	    assert!(false);
+	};
+
+    }
+
+    #[test]
+    fn nn_test_taylor_expand(){
+	let mut nn = NeuralNetwork::<f64>::new();
+	let mut counter = 1;
+	let mut result_label = "".to_string();
+	nn.create_neuron("x",true).borrow_mut().assign(Tensor::<f64>::from_array(&[1,1], &[std::f64::consts::PI/4.0]));
+	nn.add_neuron(Neuron::<f64>::create("0",  Tensor::<f64>::from_array(&[1,1], &[0.0])));
+
+	loop {
+	    let label = "term_".to_string()+&counter.to_string();
+	    let sum_label = "sum_".to_string()+&counter.to_string();
+	    let power_int = (counter-1)*2 + 1;
+	    let power = power_int as f64;
+	    if counter == 1 {
+		let const_label = power_int.to_string();
+		nn.add_neuron(Neuron::<f64>::create(&const_label,  Tensor::<f64>::from_array(&[1,1], &[power])));
+		nn.add_synapse(vec!(),       &label,     vec!["x",&const_label], vec![&label],     Synapse::<f64>::pow());
+		nn.add_synapse(vec![&label], &sum_label, vec!["0", &label],      vec![&sum_label], Synapse::<f64>::add());
+	    }
+	    else {
+		let const_label = power_int.to_string();
+		let factorial:f64 = (1..(power_int+1)).fold(1.0, |p, n| p * (n as f64));
+		let c:f64 = (-1.0 as f64).powi(counter-1)/factorial;
+		let coff_label = "coff_".to_string()+&counter.to_string();
+		let power_label = "power_".to_string()+&power_int.to_string();
+		let prev_sum_label = "sum_".to_string()+&(counter-1).to_string();
+		// c = (-1)^(counter-1)/power_int!
+		nn.add_neuron(Neuron::<f64>::create(&coff_label,  Tensor::<f64>::from_array(&[1,1], &[c])));
+		nn.add_neuron(Neuron::<f64>::create(&const_label, Tensor::<f64>::from_array(&[1,1], &[power])));
+		//println!("fact {}! {}\n", power_int, factorial);
+		nn.add_synapse(vec!(), &power_label, vec!["x",&const_label],  vec![&power_label], Synapse::<f64>::pow());
+		nn.add_synapse(vec![&power_label], &label, vec![&coff_label, &power_label], vec![&label], Synapse::<f64>::mul());
+		nn.add_synapse(vec![&prev_sum_label, &label], &sum_label, vec![&prev_sum_label, &label],  vec![&sum_label], Synapse::<f64>::add());
+		result_label = sum_label;
+	    };
+	    //println!("{} {}", label, nn.ref_neuron(&label).borrow());
+	    if nn.ref_neuron(&label).borrow().element(vec![0,0]).abs() < 1.0e-4 {
+		/*
+		println!("{} {} {}",
+			 nn.ref_neuron(&label).borrow().element(vec![0,0]),
+			 nn.ref_neuron(&label).borrow().element(vec![0,0]) < 1.0e-4,
+			 1.0e-4);
+		*/
+		break;
+	    }
+	    counter += 1;
+	}
+
+
+	println!("taylor: {} {}",nn.ref_neuron(&result_label).borrow().element(vec![0,0]),(std::f64::consts::PI/4.0).sin());
+	let diff = (nn.ref_neuron(&result_label).borrow().element(vec![0,0])-(std::f64::consts::PI/4.0).sin()).abs();
+	assert!(diff < 1.0e-5);
+	nn.backward_prop(false);
+
+	if let Some(g) = nn.ref_neuron("x").borrow().grad() {
+	    let diff = (g[vec![0,0]]-(std::f64::consts::PI/4.0).cos()).abs();
+	    println!("taylor: {} {}",g[vec![0,0]],(std::f64::consts::PI/4.0).cos());
+	    assert!(diff < 1.0e-5);
+	}
+	else {
+	    assert!(false);
+	}
+	nn.gen_dot_graph("taylor_graph.dot");
     }
 }
 
