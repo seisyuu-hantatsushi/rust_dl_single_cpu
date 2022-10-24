@@ -284,11 +284,16 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	}
 
 	if !remain_grad {
-	    for g in 1..self.generation_table.len() {
-		for sn in self.generation_table[g].iter() {
-		    for ni in  sn.borrow().inputs.iter() {
-			ni.borrow_mut().clear_grad();
+	    for (key,n) in self.neurons.iter() {
+		let mut is_input_neuron = false;
+		for ni in self.input_neurons.iter(){
+		    if ni.borrow().name() == key {
+			is_input_neuron = true;
 		    }
+		}
+		if !is_input_neuron {
+		    //println!("clear grad: {}",n.borrow().name());
+		    n.borrow_mut().clear_grad();
 		}
 	    }
 	}
@@ -359,28 +364,10 @@ mod tests {
 
     #[test]
     fn nn_test_add() {
-	let mut nn = NeuralNetwork::<f32>::new();
-	let n1 = Tensor::<f32>::from_array(&[1,1], &[1.0]);
-	let n2 = Tensor::<f32>::from_array(&[1,1], &[1.0]);
 
-	nn.create_neuron("n1",true);
-	nn.create_neuron("n2",true);
-	nn.create_neuron("n3",false);
-
-	nn.create_synapse(Vec::new(),
-			  "add1", vec!["n1", "n2"], vec!["n3"],
-			  | inputs | -> Vec<Tensor<f32>> {
-			      vec![inputs[0] + inputs[1]]
-			  },
-			  | _inputs, grad | -> Vec<Tensor<f32>> {
-			      vec![grad.clone(),grad.clone()]
-			  });
-
-	nn.forward_prop(vec![n1,n2]);
-
-	println!("n3 {}", nn.ref_neuron("n3").borrow());
     }
 
+    /*
     #[test]
     fn nn_test_single_link() {
 	let mut nn = NeuralNetwork::<f32>::new();
@@ -994,5 +981,82 @@ mod tests {
 	}
 	nn.gen_dot_graph("taylor_graph.dot");
     }
+
+    #[test]
+    fn nn_gradietn_descent() {
+	let mut nn = NeuralNetwork::<f64>::new();
+	let iters = 50000;
+	let learning_rate = 0.001;
+
+	nn.create_neuron("x0",true);
+	nn.create_neuron("x1",true);
+
+	nn.add_neuron(Neuron::<f64>::create("1",  Tensor::<f64>::from_array(&[1,1], &[1.0])));
+	nn.add_neuron(Neuron::<f64>::create("2",  Tensor::<f64>::from_array(&[1,1], &[2.0])));
+	nn.add_neuron(Neuron::<f64>::create("100",Tensor::<f64>::from_array(&[1,1], &[100.0])));
+
+	nn.add_synapse(vec!(),              "x0^2",            vec!["x0","2"],      vec!["x0^2"],        Synapse::<f64>::pow());
+	nn.add_synapse(vec!(),              "x0-1",            vec!["x0","1"],      vec!["x0-1"],        Synapse::<f64>::sub());
+	nn.add_synapse(vec!["x0^2"],        "x1-x0^2",         vec!["x1","x0^2"],   vec!["x1-x0^2"],     Synapse::<f64>::sub());
+	nn.add_synapse(vec!["x1-x0^2"],     "(x1-x0^2)^2",     vec!["x1-x0^2","2"], vec!["(x1-x0^2)^2"], Synapse::<f64>::pow());
+	nn.add_synapse(vec!["(x1-x0^2)^2"], "100*(x1-x0^2)^2",
+		       vec!["100","(x1-x0^2)^2"],
+		       vec!["100*(x1-x0^2)^2"], Synapse::<f64>::mul());
+	nn.add_synapse(vec!["x0-1"], "(x0-1)^2",
+		       vec!["x0-1","2"],
+		       vec!["(x0-1)^2"], Synapse::<f64>::pow());
+	nn.add_synapse(vec!["100*(x1-x0^2)^2", "(x0-1)^2"], "100*(x1-x0^2)^2+(x0-1)^2",
+		       vec!["100*(x1-x0^2)^2", "(x0-1)^2"],
+		       vec!["y"], Synapse::<f64>::add());
+
+	nn.clear_grad();
+	nn.gen_dot_graph("gd_graph.dot");
+
+	fn rosenbrock(x0:f64, x1:f64) -> f64 {
+	    100.0 * ((x1 - x0.powi(2)).powi(2)) + (x0 - 1.0).powi(2)
+	}
+
+	let mut counter = 0;
+	let mut x0 = 0.0;
+	let mut x1 = 2.0;
+
+	while counter < iters {
+	    let tensor_x0 = Tensor::<f64>::from_array(&[1,1], &[x0]);
+	    let tensor_x1 = Tensor::<f64>::from_array(&[1,1], &[x1]);
+
+	    //println!("{} {} {}",counter, x0, x1);
+	    nn.forward_prop(vec![tensor_x0, tensor_x1]);
+	    nn.backward_prop(true);
+
+	    let delta = 1.0e-4;
+	    assert!((nn.ref_neuron("y").borrow().element(vec![0,0])-rosenbrock(x0,x1)).abs() < 1.0e-4);
+	    if let Some(g) = nn.ref_neuron("x0").borrow().grad() {
+		let diff =
+		    (rosenbrock(x0+delta,x1)-rosenbrock(x0-delta,x1))/(2.0*delta) - g[vec![0,0]];
+		assert!(diff < delta);
+		x0 -= learning_rate * g[vec![0,0]];
+	    }
+	    else {
+		assert!(false);
+	    };
+
+	    if let Some(g) = nn.ref_neuron("x1").borrow().grad() {
+		let diff =
+		    (rosenbrock(x0,x1+delta)-rosenbrock(x0,x1-delta))/(2.0*delta) - g[vec![0,0]];
+		assert!(diff < delta);
+
+		x1 -= learning_rate * g[vec![0,0]];
+	    }
+	    else {
+		assert!(false);
+	    };
+	    counter += 1;
+
+	    nn.clear_grad();
+	}
+	assert!((x0-1.0).abs() < 1e-5);
+	assert!((x1-1.0).abs() < 1e-5);
+    }
+*/
 }
 

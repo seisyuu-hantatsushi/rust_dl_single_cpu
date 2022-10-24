@@ -13,7 +13,7 @@ impl<T> Synapse<T>
 where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + std::fmt::Debug {
 
     pub fn new(forward : fn (inputs: &Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-	       backward: fn (inputs: &Vec<&Tensor<T>>,grad:&Tensor<T>) -> Vec<Tensor<T>>) -> Synapse<T> {
+	       backward: fn (inputs: &Vec<&Tensor<T>>, grad:&Tensor<T>) -> Vec<Tensor<T>>) -> Synapse<T> {
 	Synapse {
 	    forward,
 	    backward,
