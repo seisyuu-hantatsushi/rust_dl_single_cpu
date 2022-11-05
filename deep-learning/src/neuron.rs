@@ -1,11 +1,11 @@
 /* -*- tab-width:4 -*- */
 
 use std::fmt;
-use std::cell::{Ref,RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::tensor_base::Tensor;
 
-use crate::neural_network::NNSynapseNode;
+use crate::synapse::NNSynapseNode;
 
 pub struct Neuron<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
