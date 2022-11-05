@@ -48,7 +48,7 @@ impl<T> ops::Sub<&Tensor<T>> for Tensor<T>
 
 /* T = &T - &T */
 impl<T> ops::Sub for &Tensor<T>
-   where T:num::Num + Copy + std::fmt::Debug
+   where T:num::Num + Copy
 {
     type Output = Tensor<T>;
     fn sub(self, other: Self) -> Self::Output {

@@ -8,4 +8,5 @@ pub mod tensor_scale;
 pub mod tensor_pow;
 pub mod tensor_square;
 pub mod tensor_exp;
+pub mod tensor_log;
 pub mod tensor_affine;
