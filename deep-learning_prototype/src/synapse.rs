@@ -72,7 +72,7 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 	    },
 	    backward: |inputs, grad| {
 		let two = num::FromPrimitive::from_f64(2.0).unwrap();
-		let gl = Tensor::<T>::div_rank0(grad,inputs[0]);
+		let gl = Tensor::<T>::div_rank0(grad,inputs[1]);
 		let gr = Tensor::<T>::mul_rank0(grad, &Tensor::<T>::div_rank0(&inputs[0].neg(), &inputs[1].pow_rank0(two)));
 		vec![ gl, gr ]
 	    }
