@@ -72,12 +72,24 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		}
 	}
 
+	pub fn name(&self) -> &str {
+		&self.name
+	}
+
 	pub fn get_generation(&self) -> usize {
 		self.generation
 	}
 
 	pub fn set_generation(&mut self, generation:usize) {
 		self.generation = generation
+	}
+
+	pub fn inputs(&self) -> &Vec<Rc<RefCell<Neuron<T>>>> {
+		&self.inputs
+    }
+
+	pub fn outputs(&self) -> &Vec<Rc<RefCell<Neuron<T>>>> {
+		&self.outputs
 	}
 
 	pub fn neg(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {

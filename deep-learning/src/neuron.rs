@@ -39,6 +39,10 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 		&self.name
 	}
 
+	pub fn rename(&mut self, name:&str) {
+		self.name = name.to_string();
+	}
+
 	pub fn set_generator(&mut self, s:NNSynapseNode<T>){
 		self.generator = Some(Rc::clone(&s))
 	}

@@ -1,5 +1,6 @@
 /* -*- tab-width:4 -*- */
-use std::fmt;
+use std::{fmt,fs};
+use std::io::Write;
 use std::cell::{Ref,RefCell};
 use std::rc::Rc;
 use std::collections::HashMap;
@@ -8,13 +9,122 @@ use linear_transform::tensor::tensor_base::Tensor;
 use crate::neuron::{NNNeuron,Neuron,nn_neuron_new};
 use crate::synapse::{NNSynapseNode,SynapseNode};
 
-struct NeuralNetwork<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+struct ComputationalGraph<T>
+where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	neurons: HashMap<* const RefCell<Neuron<T>>, NNNeuron<T>>,
-	synapse_node: HashMap<* const RefCell<SynapseNode<T>>, Rc<RefCell<SynapseNode<T>>>>,
+	synapse_nodes: HashMap<* const RefCell<SynapseNode<T>>, Rc<RefCell<SynapseNode<T>>>>,
 	generation_table: Vec<NNSynapseNode<T>>
 }
 
+impl<T> ComputationalGraph<T>
+where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+
+	fn new() -> ComputationalGraph<T> {
+		ComputationalGraph {
+			neurons: HashMap::new(),
+			synapse_nodes: HashMap::new(),
+			generation_table: Vec::new()
+		}
+	}
+
+	fn append_nodes(&mut self, ns:Vec<NNSynapseNode<T>>) {
+		for node in ns.iter() {
+			self.synapse_nodes.insert(Rc::as_ptr(node), Rc::clone(node));
+		}
+	}
+
+	fn append_neurons(&mut self, ns:Vec<NNNeuron<T>>) {
+		for neuron in ns.iter() {
+			self.neurons.insert(Rc::as_ptr(neuron), Rc::clone(neuron));
+		}
+	}
+
+	fn forward(&mut self) -> Vec<NNNeuron<T>> {
+		vec!()
+	}
+
+	pub fn make_dot_graph(&mut self, file_name:&str) -> () {
+		let mut output = "digraph g {\n".to_string();
+		let start_trim: &[_] = &['0','x'];
+		for n in self.neurons.values() {
+			let nref = n.borrow();
+			let id_str = format!("{:p}", Rc::as_ptr(&n));
+			output = output.to_string() + "\"" + &id_str + "\"" + " [label=\"" + nref.name() + "\", color=orange, style=filled]" + "\n";
+		}
+		for sn in self.synapse_nodes.values() {
+			let sn_ref = sn.borrow();
+			let id_str = format!("{:p}", Rc::as_ptr(&sn));
+			output = output.to_string() + "\"" + &id_str + "\"" + " [label=\"" + sn_ref.name() + "\", color=lightblue, style=filled, shape=box ]" + "\n";
+			for ni in sn_ref.inputs().iter() {
+				let niid_str = format!("{:p}",Rc::as_ptr(&ni));
+				output = output.to_string() + "\"" + &niid_str.to_string() + "\"->\"" + &id_str + "\"\n"
+			}
+
+			for no in sn_ref.outputs().iter() {
+				let noid_str = format!("{:p}", Rc::as_ptr(&no));
+				output = output.to_string() + "\"" + &id_str + "\"->\"" + &noid_str + "\"\n"
+			}
+		}
+
+		output = output + "}";
+		let mut ofs = fs::File::create(file_name).unwrap();
+		ofs.write_all(output.as_bytes());
+	}
+
+
+}
+
+pub struct NeuralNetwork<T>
+where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+	cg_order: Vec<ComputationalGraph<T>>
+}
+
+impl<T> NeuralNetwork<T>
+where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+	pub fn new() -> NeuralNetwork<T> {
+		NeuralNetwork {
+			cg_order: vec![ComputationalGraph::<T>::new()]
+		}
+	}
+
+	pub fn create_neuron(&mut self, label:&str, init_signal: Tensor<T>) -> NNNeuron<T> {
+		let nn = nn_neuron_new(label, init_signal);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&nn)]);
+		nn
+	}
+
+	pub fn add(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::add(x,y);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
+	pub fn forward_propagating(&mut self, order:usize) -> Result<Vec<NNNeuron<T>>,String> {
+		if order < self.cg_order.len() {
+			let outputs = self.cg_order[order].forward();
+			Ok(outputs)
+		}
+		else {
+			Err("invalid order".to_string())
+		}
+	}
+
+	pub fn backward_propagating(&mut self, order:usize) -> Result<Vec<NNNeuron<T>>,String> {
+		Err("invalid order".to_string())
+	}
+
+	pub fn make_dot_graph(&mut self, order:usize, file_name:&str) -> Result<(),String> {
+		if order < self.cg_order.len() {
+			self.cg_order[order].make_dot_graph(file_name);
+			Ok(())
+		}
+		else {
+			Err("invalid order".to_string())
+		}
+	}
+
+}
 
 #[cfg(test)]
 mod tests {
@@ -155,6 +265,19 @@ mod tests {
 					println!("a.grad=None");
 					assert!(false);
 				}
+			}
+
+			{
+				let mut nn = NeuralNetwork::<f64>::new();
+				let (x0,y0) = (1.0,1.0);
+				let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
+				let y = nn.create_neuron("y", Tensor::<f64>::from_array(&[1,1],&[y0]));
+				let z = nn.add(x,y);
+				z.borrow_mut().rename("z");
+				println!("{}", z.borrow());
+
+				nn.make_dot_graph(0,"order0_graph.dot");
+				
 			}
 		}
 	}
