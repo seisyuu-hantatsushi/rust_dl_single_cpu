@@ -347,7 +347,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn pow_rank0(a:NNNeuron<T>, x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		assert_eq!(x.borrow().shape(),&[1,1]);
 		assert_eq!(a.borrow().shape(),&[1,1]);
-		let label = "(".to_string() + a.borrow().name() + "(^0)" + x.borrow().name() + x.borrow().name() + ")";
+		let label = "(".to_string() + a.borrow().name() + "(^0)" + x.borrow().name() + ")";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&a),Rc::clone(&x)],
