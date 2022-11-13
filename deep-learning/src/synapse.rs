@@ -2,11 +2,11 @@
 use std::fmt;
 use std::cell::{Ref,RefCell};
 use std::rc::Rc;
-use linear_transform::tensor::tensor_base::Tensor;
+use linear_transform::tensor::Tensor;
 
-use crate::neuron::{NNNeuron,Neuron,nn_neuron_new};
+use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
-type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>, grads: &Vec<NNNeuron<T>>) -> Vec<NNSynapseNode<T>>;
+type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>, grads: &Vec<NNNeuron<T>>) -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>);
 
 pub struct Synapse<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
@@ -93,7 +93,8 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 	pub fn neg(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		let label = "-".to_string()+x.borrow().name();
+		//let label = "-".to_string()+x.borrow().name();
+		let label = "neg";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x)],
@@ -104,22 +105,27 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+											  outputs.push(Rc::clone(&grads[0]));
 											  for ni in inputs.iter() {
 												  let mut n = ni.borrow_mut();
 												  if let Some(ref g) = n.ref_grad() {
 													  let (sn,output) = Self::neg(Rc::clone(&grads[0]));
 													  sns.push(sn);
+													  outputs.push(Rc::clone(&output));
 													  let (sn,output) = Self::add(Rc::clone(&g), output);
 													  sns.push(sn);
-													  n.set_grad(Rc::clone(&output));
+													  outputs.push(Rc::clone(&output));
+													  n.set_grad(output);
 												  }
 												  else {
 													  let (sn,output) = Self::neg(Rc::clone(&grads[0]));
 													  sns.push(sn);
-													  n.set_grad(Rc::clone(&output));
+													  outputs.push(Rc::clone(&output));
+													  n.set_grad(output);
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -129,7 +135,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 	pub fn add(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		let label = "(".to_string()+x.borrow().name() + "+" + y.borrow().name() +")";
+		let label = "add";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x),Rc::clone(&y)],
@@ -140,18 +146,24 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+											  outputs.push(Rc::clone(&grads[0]));
 											  for ni in inputs.iter() {
 												  let mut n = ni.borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&grads[0]));
-													  n.set_grad(Rc::clone(&output));
-													  sns.push(Rc::clone(&sn))
-												  }
-												  else {
-													  n.set_grad(Rc::clone(&grads[0]))
+												  if !n.is_constant() {
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&grads[0]));
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(Rc::clone(&sn));
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(Rc::clone(&grads[0]))
+													  }
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -161,7 +173,8 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 	pub fn sub(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		let label = "(".to_string()+x.borrow().name() + "-" + y.borrow().name() +")";
+		//let label = "(".to_string()+x.borrow().name() + "-" + y.borrow().name() +")";
+		let label = "sub";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x),Rc::clone(&y)],
@@ -172,27 +185,38 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+											  outputs.push(Rc::clone(&grads[0]));
 											  let (sn,output) = Self::neg(Rc::clone(&grads[0]));
 											  let mut n = inputs[0].borrow_mut();
-											  if let Some(ref g) = n.ref_grad() {
-												  let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&grads[0]));
-												  n.set_grad(output);
-												  sns.push(sn)
+											  if !n.is_constant() {
+												  if let Some(ref g) = n.ref_grad() {
+													  outputs.push(Rc::clone(&g));
+													  let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&grads[0]));
+													  n.set_grad(Rc::clone(&output));
+													  sns.push(sn);
+													  outputs.push(output);
+												  }
+												  else {
+													  n.set_grad(Rc::clone(&grads[0]));
+												  }
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
 											  }
-											  else {
-												  n.set_grad(Rc::clone(&grads[0]));
-											  }
-											  sns.push(sn);
 											  let mut n = inputs[1].borrow_mut();
-											  if let Some(ref g) = n.ref_grad() {
-												  let (sn, output) = Self::add(Rc::clone(&g), output);
-												  n.set_grad(output);
-												  sns.push(sn)
+											  if !n.is_constant() {
+												  if let Some(ref g) = n.ref_grad() {
+													  outputs.push(Rc::clone(&g));
+													  let (sn, output) = Self::add(Rc::clone(&g), output);
+													  n.set_grad(Rc::clone(&output));
+													  sns.push(sn);
+													  outputs.push(output);
+												  }
+												  else {
+													  n.set_grad(output);
+												  }
 											  }
-											  else {
-												  n.set_grad(output);
-											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -204,7 +228,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn mul_rank0(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		assert_eq!(x.borrow().shape(),&[1,1]);
 		assert_eq!(y.borrow().shape(),&[1,1]);
-		let label = "(".to_string()+x.borrow().name() + "<^0*^0>" + y.borrow().name() +")";
+		let label = "mul_rank0";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x),Rc::clone(&y)],
@@ -215,33 +239,52 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
-											  let (l_sn, l_output) = Self::mul_rank0(Rc::clone(&grads[0]), Rc::clone(&inputs[1]));
-											  let (r_sn, r_output) = Self::mul_rank0(Rc::clone(&grads[0]), Rc::clone(&inputs[0]));
-											  sns.push(l_sn);
-											  sns.push(r_sn);
-											  {
-												  let mut n = inputs[0].borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), l_output);
-													  n.set_grad(output);
-													  sns.push(sn)
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+
+											  if  !inputs[0].borrow().is_constant() ||
+												  !inputs[1].borrow().is_constant() {
+													  outputs.push(Rc::clone(&grads[0]));
 												  }
-												  else {
-													  n.set_grad(l_output);
+
+											  if !inputs[0].borrow().is_constant() {
+												  let (l_sn, l_output) = Self::mul_rank0(Rc::clone(&grads[0]), Rc::clone(&inputs[1]));
+												  sns.push(l_sn);
+												  outputs.push(Rc::clone(&inputs[1]));
+												  outputs.push(Rc::clone(&l_output));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), l_output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(l_output);
+													  }
 												  }
 											  }
-											  {
-												  let mut n = inputs[1].borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), r_output);
-													  n.set_grad(output);
-													  sns.push(sn)
-												  }
-												  else {
-													  n.set_grad(r_output);
+											  if !inputs[1].borrow().is_constant() {
+												  let (r_sn, r_output) = Self::mul_rank0(Rc::clone(&grads[0]), Rc::clone(&inputs[0]));
+												  sns.push(r_sn);
+												  outputs.push(Rc::clone(&inputs[0]));
+												  outputs.push(Rc::clone(&r_output));
+												  {
+													  let mut n = inputs[1].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), r_output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(r_output);
+													  }
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -253,7 +296,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn div_rank0(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		assert_eq!(x.borrow().shape(),&[1,1]);
 		assert_eq!(y.borrow().shape(),&[1,1]);
-		let label = "(".to_string()+x.borrow().name() + "<^0*^0>" + y.borrow().name() +")";
+		let label = "div_rank0";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x),Rc::clone(&y)],
@@ -264,41 +307,60 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
-											  let two = Rc::new(RefCell::new(Neuron::<T>::new("2.0",
-																							  (Tensor::<T>::one(&[1,1]))+Tensor::<T>::one(&[1,1]))));
-											  let (l_sn, l_output) = Self::div_rank0(Rc::clone(&grads[0]), Rc::clone(&inputs[1]));
-											  sns.push(l_sn);
-											  let (neg, neg_input0) = Self::neg(Rc::clone(&inputs[0]));
-											  sns.push(neg);
-											  let (r_sn, r_output) = Self::pow_rank0(Rc::clone(&inputs[1]),two);
-											  sns.push(r_sn);
-											  let (r_sn, r_output) = Self::div_rank0(neg_input0, r_output);
-											  sns.push(r_sn);
-											  let (r_sn, r_output) = Self::mul_rank0(Rc::clone(&grads[0]), r_output);
-											  sns.push(r_sn);
-											  {
-												  let mut n = inputs[0].borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), l_output);
-													  n.set_grad(output);
-													  sns.push(sn)
-												  }
-												  else {
-													  n.set_grad(l_output);
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+											  if !inputs[0].borrow().is_constant() {
+												  let (l_sn, l_output) = Self::div_rank0(Rc::clone(&grads[0]), Rc::clone(&inputs[1]));
+												  outputs.push(Rc::clone(&grads[0]));
+												  outputs.push(Rc::clone(&inputs[1]));
+												  sns.push(l_sn);
+												  outputs.push(Rc::clone(&l_output));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), l_output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(l_output);
+													  }
 												  }
 											  }
-											  {
-												  let mut n = inputs[1].borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), r_output);
-													  n.set_grad(output);
-													  sns.push(sn)
-												  }
-												  else {
-													  n.set_grad(r_output);
+
+											  if !inputs[1].borrow().is_constant() {
+												  let two = Rc::new(RefCell::new(Neuron::<T>::new("2.0",
+																								  (Tensor::<T>::one(&[1,1]))+Tensor::<T>::one(&[1,1]))));
+												  outputs.push(Rc::clone(&two));
+												  let (neg, neg_input0) = Self::neg(Rc::clone(&inputs[0]));
+												  outputs.push(Rc::clone(&inputs[0]));
+												  sns.push(neg);
+												  outputs.push(Rc::clone(&neg_input0));
+												  let (r_sn, r_output) = Self::pow_rank0(Rc::clone(&inputs[1]),two);
+												  sns.push(r_sn);
+												  outputs.push(Rc::clone(&r_output));
+												  let (r_sn, r_output) = Self::div_rank0(neg_input0, r_output);
+												  sns.push(r_sn);
+												  outputs.push(Rc::clone(&r_output));
+												  let (r_sn, r_output) = Self::mul_rank0(Rc::clone(&grads[0]), r_output);
+												  sns.push(r_sn);
+												  outputs.push(Rc::clone(&r_output));
+												  {
+													  let mut n = inputs[1].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), r_output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(r_output);
+													  }
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -320,22 +382,27 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  let (sn1,output) = Self::exp(Rc::clone(&inputs[0]));
 											  sns.push(sn1);
+											  outputs.push(Rc::clone(&output));
 											  let (sn2,output) = Self::mul_rank0(output,Rc::clone(&grads[0]));
 											  sns.push(sn2);
+											  outputs.push(Rc::clone(&output));
 											  {
 												  let mut n = inputs[0].borrow_mut();
 												  if let Some(ref g) = n.ref_grad() {
+													  outputs.push(Rc::clone(&g));
 													  let (sn, output) = Self::add(Rc::clone(&g), output);
-													  n.set_grad(output);
-													  sns.push(sn)
+													  n.set_grad(Rc::clone(&output));
+													  sns.push(sn);
+													  outputs.push(output);
 												  }
 												  else {
 													  n.set_grad(output);
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -347,7 +414,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn pow_rank0(a:NNNeuron<T>, x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		assert_eq!(x.borrow().shape(),&[1,1]);
 		assert_eq!(a.borrow().shape(),&[1,1]);
-		let label = "(".to_string() + a.borrow().name() + "(^0)" + x.borrow().name() + ")";
+		let label = "pow";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&a),Rc::clone(&x)],
@@ -358,44 +425,72 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
-											  let one = Rc::new(RefCell::new(Neuron::<T>::new("1.0", Tensor::<T>::one(&[1,1]))));
-											  let (dec_index_sn, dec_index) = Self::sub(Rc::clone(&inputs[1]),one);
-											  sns.push(dec_index_sn);
-											  let (l_sn,l_output) = Self::pow_rank0(Rc::clone(&inputs[0]), dec_index);
-											  sns.push(l_sn);
-											  let (l_sn,l_output) = Self::mul_rank0(Rc::clone(&inputs[1]), l_output);
-											  sns.push(l_sn);
-											  let (l_sn,l_output) = Self::mul_rank0(Rc::clone(&grads[0]),  l_output);
-											  sns.push(l_sn);
-											  let (r_sn,r_output) = Self::pow_rank0(Rc::clone(&inputs[0]),Rc::clone(&inputs[1]));
-											  sns.push(r_sn);
-											  let (baselog_sn, baselog) = Self::ln_rank0(Rc::clone(&inputs[0]));
-											  sns.push(baselog_sn);
-											  let (r_sn,r_output) = Self::mul_rank0(baselog,r_output);
-											  sns.push(r_sn);
-											  {
-												  let mut n = inputs[0].borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), l_output);
-													  n.set_grad(output);
-													  sns.push(sn)
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+											  if !inputs[0].borrow().is_constant() {
+												  let dec_index = if inputs[1].borrow().is_constant() {
+													  let t = inputs[1].borrow().ref_signal() - Tensor::<T>::one(&[1,1]);
+													  let label = inputs[1].borrow().name().to_string() + "-1.0";
+													  Rc::new(RefCell::new(Neuron::<T>::constant(&label, t)))
 												  }
 												  else {
-													  n.set_grad(l_output);
+													  let one = Rc::new(RefCell::new(Neuron::<T>::constant("1.0", Tensor::<T>::one(&[1,1]))));
+													  outputs.push(Rc::clone(&one));
+													  let (dec_index_sn, dec_index) = Self::sub(Rc::clone(&inputs[1]),one);
+													  sns.push(dec_index_sn);
+													  dec_index
+												  };
+												  outputs.push(Rc::clone(&dec_index));
+												  let (l_sn,l_output) = Self::pow_rank0(Rc::clone(&inputs[0]), dec_index);
+												  outputs.push(Rc::clone(&inputs[0]));
+												  sns.push(l_sn);
+												  outputs.push(Rc::clone(&l_output));
+												  let (l_sn,l_output) = Self::mul_rank0(Rc::clone(&inputs[1]), l_output);
+												  outputs.push(Rc::clone(&inputs[1]));
+												  sns.push(l_sn);
+												  outputs.push(Rc::clone(&l_output));
+												  let (l_sn,l_output) = Self::mul_rank0(Rc::clone(&grads[0]),  l_output);
+												  sns.push(l_sn);
+												  outputs.push(Rc::clone(&l_output));
+												  outputs.push(Rc::clone(&grads[0]));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), l_output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(l_output);
+													  }
 												  }
 											  }
-											  {
-												  let mut n = inputs[1].borrow_mut();
-												  if let Some(ref g) = n.ref_grad() {
-													  let (sn, output) = Self::add(Rc::clone(&g), r_output);
-													  n.set_grad(output);
-													  sns.push(sn)
-												  }
-												  else {
-													  n.set_grad(r_output);
+											  if !inputs[1].borrow().is_constant() {
+												  let (r_sn,r_output) = Self::pow_rank0(Rc::clone(&inputs[0]),Rc::clone(&inputs[1]));
+												  sns.push(r_sn);
+												  outputs.push(Rc::clone(&r_output));
+												  let (baselog_sn, baselog) = Self::ln_rank0(Rc::clone(&inputs[0]));
+												  sns.push(baselog_sn);
+												  outputs.push(Rc::clone(&baselog));
+												  let (r_sn,r_output) = Self::mul_rank0(baselog,r_output);
+												  sns.push(r_sn);
+												  outputs.push(Rc::clone(&r_output));
+												  {
+													  let mut n = inputs[1].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), r_output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(r_output);
+													  }
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -405,7 +500,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 	pub fn ln_rank0(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		let label = "(ln0(".to_string() + x.borrow().name() + ")";
+		let label = "ln_rank0";
 		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x)],
@@ -416,24 +511,30 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  // (ln x)' = 1/x
-											  let one = Rc::new(RefCell::new(Neuron::<T>::new("1.0", Tensor::<T>::one(&[1,1]))));
+											  let one = nn_neuron_constant("1.0", Tensor::<T>::one(&[1,1]));
+											  outputs.push(Rc::clone(&one));
 											  let (inverse_sn, inverse) = Self::div_rank0(one, Rc::clone(&inputs[0]));
 											  sns.push(inverse_sn);
+											  outputs.push(Rc::clone(&inverse));
 											  let (sn, output) = Self::mul_rank0(Rc::clone(&grads[0]), inverse);
 											  sns.push(sn);
+											  outputs.push(Rc::clone(&output));
 											  {
 												  let mut n = inputs[0].borrow_mut();
 												  if let Some(ref g) = n.ref_grad() {
+													  outputs.push(Rc::clone(&g));
 													  let (sn, output) = Self::add(Rc::clone(&g), output);
-													  n.set_grad(output);
-													  sns.push(sn)
+													  n.set_grad(Rc::clone(&output));
+													  sns.push(sn);
+													  outputs.push(output);
 												  }
 												  else {
 													  n.set_grad(output);
 												  }
 											  }
-											  sns
+											  (sns,outputs)
 										  }
 									  });
 		let rs = Rc::new(RefCell::new(s));
@@ -449,7 +550,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		self.outputs.iter().zip(outputs.into_iter()).map(|(n,t)| {n.borrow_mut().assign(t); Rc::clone(n)}).collect()
     }
 
-    pub fn make_diff_node(&self) -> Vec<NNSynapseNode<T>> {
+    pub fn make_diff_node(&self) -> (Vec<NNSynapseNode<T>>, Vec<NNNeuron<T>>) {
 		let grads =
 			self.outputs.iter().map(|no| no.borrow_mut().get_grad()).collect();
 		(self.synapse.make_diff_node)(&self.inputs, &grads)

@@ -3,13 +3,14 @@
 use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
-use linear_transform::tensor::tensor_base::Tensor;
+use linear_transform::tensor::Tensor;
 
 use crate::synapse::NNSynapseNode;
 
 pub struct Neuron<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 	name: String,
+	constant: bool,
 	signal: Tensor<T>,
 	generator: Option<NNSynapseNode<T>>,
 	grad: Option<NNNeuron<T>>
@@ -29,10 +30,25 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 	pub fn new(name:&str, init_signal:Tensor<T>) -> Neuron<T> {
 		Neuron {
 			name: name.to_string(),
+			constant: false,
 			signal: init_signal,
 			generator: None,
 			grad: None
 		}
+	}
+
+	pub fn constant(name:&str, init_signal:Tensor<T>) -> Neuron<T> {
+		Neuron {
+			name: name.to_string(),
+			constant: true,
+			signal: init_signal,
+			generator: None,
+			grad: None
+		}
+	}
+
+	pub fn is_constant(&self) -> bool {
+		self.constant
 	}
 
 	pub fn name(&self) -> &str {
@@ -64,6 +80,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 	}
 
 	pub fn set_grad(&mut self, grad:NNNeuron<T>) {
+		assert!(!self.constant);
 		self.grad = Some(grad)
 	}
 
@@ -74,10 +91,14 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 		else {
 			let label = "g'".to_string() + self.name();
 			let shape = self.signal.shape();
-			let new_grad = Rc::new(RefCell::new(Neuron::<T>::new(&label,Tensor::<T>::one(&shape))));
+			let new_grad = Rc::new(RefCell::new(Neuron::<T>::constant(&label,Tensor::<T>::one(&shape))));
 			self.grad = Some(Rc::clone(&new_grad));
 			new_grad
 		}
+	}
+
+	pub fn clear_grad(&mut self) {
+		self.grad = None;
 	}
 
 	pub fn shape(&self) -> &[usize] {
@@ -90,4 +111,9 @@ pub type NNNeuron<T> = Rc<RefCell<Neuron<T>>>;
 pub fn nn_neuron_new<T>(name:&str, init_signal:Tensor<T>) -> NNNeuron<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 	Rc::new(RefCell::new(Neuron::<T>::new(name,init_signal)))
+}
+
+pub fn nn_neuron_constant<T>(name:&str, init_signal:Tensor<T>) -> NNNeuron<T>
+where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+	Rc::new(RefCell::new(Neuron::<T>::constant(name,init_signal)))
 }
