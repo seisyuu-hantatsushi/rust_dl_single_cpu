@@ -1,9 +1,9 @@
 /* -*- tab-width:4 -*- */
 use std::{fmt,fs};
 use std::io::Write;
-use std::cell::{Ref,RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
-use std::collections::HashMap;
+use std::collections::{BTreeSet,HashMap};
 use linear_transform::tensor::Tensor;
 
 use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
@@ -44,6 +44,27 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		}
 	}
 
+	fn erase_isolation_neuron(&mut self) {
+		let mut linked_neurons:BTreeSet<* const RefCell<Neuron<T>>> = BTreeSet::new();
+		let mut erase_keys:Vec<* const RefCell<Neuron<T>>> = vec!();
+		for sn in self.synapse_nodes.values() {
+			for ni in sn.borrow().inputs().iter() {
+				linked_neurons.insert(Rc::as_ptr(ni));
+			}
+			for no in sn.borrow().outputs().iter() {
+				linked_neurons.insert(Rc::as_ptr(no));
+			}
+		}
+		for nk in self.neurons.keys() {
+			if !linked_neurons.contains(nk) {
+				erase_keys.push(*nk);
+			}
+		}
+		for k in erase_keys.iter() {
+			let _ = self.neurons.remove(k);
+		}
+	}
+
 	fn forward(&mut self) -> Vec<NNNeuron<T>> {
 		for g in self.generation_table.iter() {
 			for node in g.iter() {
@@ -77,6 +98,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 				cg.append_neurons(outputs);
 			}
 		}
+		cg.erase_isolation_neuron();
 		cg
 	}
 
@@ -387,30 +409,7 @@ mod tests {
 					assert!(false)
 				}
 			}
-/*
-			{
-				let mut nn = NeuralNetwork::<f64>::new();
-				let (x0,y0,z0) = (1.0,1.0,1.0);
-				let c2 = nn.create_neuron("2.0", Tensor::<f64>::from_array(&[1,1],&[2.0]));
-				let a = nn.create_neuron("a", Tensor::<f64>::from_array(&[1,1],&[x0]));
-				let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
-				let y = nn.create_neuron("y", Tensor::<f64>::from_array(&[1,1],&[y0]));
-				let z = nn.create_neuron("z", Tensor::<f64>::from_array(&[1,1],&[z0]));
-				let xy = nn.mul_rank0(Rc::clone(&x), Rc::clone(&y));
-				let yz = nn.mul_rank0(Rc::clone(&y), Rc::clone(&z));
-				let term1 = nn.pow_rank0(a,c2);
-				let term2 = nn.add(Rc::clone(&yz), term1);
-				let term3 = nn.add(term2,Rc::clone(&x));
-				let w = nn.add(xy, term3);
-				w.borrow_mut().rename("w");
 
-				println!("{}", w.borrow());
-				if let Err(e) = nn.make_dot_graph(0,"graph1.dot") {
-					println!("{}",e);
-					assert!(false)
-				}
-			}
-			 */
 			{
 				let mut nn = NeuralNetwork::<f64>::new();
 				let x0 = 2.0;
@@ -463,6 +462,76 @@ mod tests {
 					}
 				}
 
+				let _ = nn.clear_grads(0);
+				let _ = nn.clear_grads(1);
+				let _ = nn.clear_grads(2);
+				let _ = nn.clear_grads(3);
+				match nn.backward_propagating(3) {
+					Ok(outputs) => {
+						for output in outputs.iter() {
+							println!("gx4 {}",output.borrow());
+						}
+					},
+					Err(e) => {
+						println!("{}",e);
+						assert!(false)
+					}
+				}
+
+				let _ = nn.clear_grads(0);
+				let _ = nn.clear_grads(1);
+				let _ = nn.clear_grads(2);
+				let _ = nn.clear_grads(3);
+				let _ = nn.clear_grads(4);
+				match nn.backward_propagating(4) {
+					Ok(outputs) => {
+						for output in outputs.iter() {
+							println!("gx5 {}",output.borrow());
+						}
+					},
+					Err(e) => {
+						println!("{}",e);
+						assert!(false)
+					}
+				}
+
+				let _ = nn.clear_grads(0);
+				let _ = nn.clear_grads(1);
+				let _ = nn.clear_grads(2);
+				let _ = nn.clear_grads(3);
+				let _ = nn.clear_grads(4);
+				let _ = nn.clear_grads(5);
+				match nn.backward_propagating(5) {
+					Ok(outputs) => {
+						for output in outputs.iter() {
+							println!("gx6 {}",output.borrow());
+						}
+					},
+					Err(e) => {
+						println!("{}",e);
+						assert!(false)
+					}
+				}
+
+				let _ = nn.clear_grads(0);
+				let _ = nn.clear_grads(1);
+				let _ = nn.clear_grads(2);
+				let _ = nn.clear_grads(3);
+				let _ = nn.clear_grads(4);
+				let _ = nn.clear_grads(5);
+				let _ = nn.clear_grads(6);
+				match nn.backward_propagating(6) {
+					Ok(outputs) => {
+						for output in outputs.iter() {
+							println!("gx7 {}",output.borrow());
+						}
+					},
+					Err(e) => {
+						println!("{}",e);
+						assert!(false)
+					}
+				}
+
 				if let Err(e) = nn.make_dot_graph(0,"graph2_order0.dot") {
 					println!("{}",e);
 					assert!(false)
@@ -482,15 +551,20 @@ mod tests {
 					println!("{}",e);
 					assert!(false)
 				}
+
+				if let Err(e) = nn.make_dot_graph(4,"graph2_order4.dot") {
+					println!("{}",e);
+					assert!(false)
+				}
 			}
-			/*
+/*
 			{
 				let mut nn = NeuralNetwork::<f64>::new();
 				let x0 = 2.0;
 				let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
-				let c4 = nn.create_neuron("4.0", Tensor::<f64>::from_array(&[1,1],&[4.0]));
-			let c2 = nn.create_neuron("2.0", Tensor::<f64>::from_array(&[1,1],&[2.0]));
-			let term1 = nn.pow_rank0(Rc::clone(&x),c4);
+				let c4 = nn.create_constant("4.0", Tensor::<f64>::from_array(&[1,1],&[4.0]));
+				let c2 = nn.create_constant("2.0", Tensor::<f64>::from_array(&[1,1],&[2.0]));
+				let term1 = nn.pow_rank0(Rc::clone(&x),c4);
 				let term2 = nn.pow_rank0(Rc::clone(&x),Rc::clone(&c2));
 				let term3 = nn.mul_rank0(Rc::clone(&c2), term2);
 				let y = nn.sub(term1,term3);
@@ -561,5 +635,4 @@ mod tests {
 */
 		}
 	}
-
 }
