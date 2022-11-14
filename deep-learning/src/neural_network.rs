@@ -557,7 +557,7 @@ mod tests {
 					assert!(false)
 				}
 			}
-/*
+
 			{
 				let mut nn = NeuralNetwork::<f64>::new();
 				let x0 = 2.0;
@@ -582,7 +582,7 @@ mod tests {
 				match nn.backward_propagating(0) {
 					Ok(outputs) => {
 						for output in outputs.iter() {
-							println!("gx {}",output.borrow());
+							println!("gx1 {}",output.borrow());
 						}
 					},
 					Err(e) => {
@@ -597,7 +597,7 @@ mod tests {
 				match nn.backward_propagating(1) {
 					Ok(outputs) => {
 						for output in outputs.iter() {
-							println!("gx {}",output.borrow());
+							println!("gx2 {}",output.borrow());
 						}
 					},
 					Err(e) => {
@@ -606,33 +606,22 @@ mod tests {
 					}
 				}
 
-				{
-					let borrowed_x = x.borrow();
-					if let Some(ref g) = borrowed_x.ref_grad() {
-						let borrowed_gx = g.borrow();
-						if let Some(ref gx_grad) = borrowed_gx.ref_grad() {
-							println!("gx2' {}", gx_grad.borrow());
-						}
-						else {
-							println!("gx2.grad = None");
-						}
-					}
-					else {
-						println!("gx.grad = None");
-					}
-				}
-
-				if let Err(e) = nn.make_dot_graph(1,"graph2_order1.dot") {
+				if let Err(e) = nn.make_dot_graph(0,"graph3_order0.dot") {
 					println!("{}",e);
 					assert!(false)
 				}
 
-				if let Err(e) = nn.make_dot_graph(2,"graph2_order2.dot") {
+				if let Err(e) = nn.make_dot_graph(1,"graph3_order1.dot") {
+					println!("{}",e);
+					assert!(false)
+				}
+
+				if let Err(e) = nn.make_dot_graph(2,"graph3_order2.dot") {
 					println!("{}",e);
 					assert!(false)
 				}
 			}
-*/
+
 		}
 	}
 }
