@@ -198,6 +198,13 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		output
 	}
 
+	pub fn div_rank0(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::div_rank0(x,y);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn pow_rank0(&mut self, a:NNNeuron<T>, x:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::pow_rank0(a,x);
 		self.cg_order[0].append_nodes(vec![sn]);
@@ -266,7 +273,7 @@ mod tests {
 			let (add1,output) = SynapseNode::<f64>::add(Rc::clone(&x),Rc::clone(&x));
 			let (add2,output) = SynapseNode::<f64>::add(Rc::clone(&output),Rc::clone(&x));
 			add2.borrow().make_diff_node();
-			let (sns,outputs) = add1.borrow().make_diff_node();
+			let (sns,_outputs) = add1.borrow().make_diff_node();
 			sns[0].borrow().forward();
 			let gx = sns[1].borrow().forward();
 			assert_eq!(output.borrow().ref_signal(), &Tensor::<f64>::from_array(&[1,1],&[9.0]));
@@ -375,7 +382,7 @@ mod tests {
 				let two =  nn_neuron_new::<f64>("2.0", Tensor::<f64>::from_array(&[1,1],&[2.0]));
 				let (square_sn, a) = SynapseNode::<f64>::pow_rank0(Rc::clone(&x),Rc::clone(&two));
 				let (exp_sq_sn, b) = SynapseNode::<f64>::exp(a);
-				let (sq_exp_sq_sn, y) = SynapseNode::<f64>::pow_rank0(b,two);
+				let (sq_exp_sq_sn, _y) = SynapseNode::<f64>::pow_rank0(b,two);
 
 				fn func(x:f64) -> f64 {
 					x.powf(2.0).exp().powf(2.0)
@@ -582,7 +589,11 @@ mod tests {
 				match nn.backward_propagating(0) {
 					Ok(outputs) => {
 						for output in outputs.iter() {
+							let delta = 1.0e-5;
+							let diff = (func(x0+delta)-func(x0-delta))/(2.0*delta);
 							println!("gx1 {}",output.borrow());
+							let gx = output.borrow().ref_signal()[vec![0,0]];
+							assert!((diff-gx).abs() <= delta);
 						}
 					},
 					Err(e) => {
@@ -595,9 +606,17 @@ mod tests {
 				let _ = nn.clear_grads(1);
 
 				match nn.backward_propagating(1) {
-					Ok(outputs) => {
-						for output in outputs.iter() {
-							println!("gx2 {}",output.borrow());
+					Ok(_outputs) => {
+						let borrowed_x = x.borrow();
+						if let Some(ref g) = borrowed_x.ref_grad() {
+							let delta = 1.0e-5;
+							let diff2 = (func(x0+delta) + func(x0-delta) - 2.0 * func(x0))/(delta.powf(2.0));
+							println!("gx2 {}",g.borrow());
+							let gx2 = g.borrow().ref_signal()[vec![0,0]];
+							assert!((diff2-gx2).abs() <= delta);
+						}
+						else {
+							assert!(false);
 						}
 					},
 					Err(e) => {
@@ -621,7 +640,74 @@ mod tests {
 					assert!(false)
 				}
 			}
+		}
 
+		{
+			//Taylor Expansion of Sin
+			let mut nn = NeuralNetwork::<f64>::new();
+			let x0 = std::f64::consts::PI/2.0;
+			let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
+			let mut tail_term = Rc::clone(&x);
+			let mut counter = 2;
+			loop {
+				let index_int = (counter-1)*2 + 1;
+				let index_real = index_int as f64;
+				let index = nn.create_constant(&index_int.to_string(),
+											   Tensor::<f64>::from_array(&[1,1],&[index_real]));
+				let sign:f64 = (-1.0f64).powi(counter-1);
+				let factorial:f64 = sign*(1..(index_int+1)).fold(1.0, |p, n| p * (n as f64));
+				let p = nn.pow_rank0(Rc::clone(&x), index);
+				let factorial_constant = nn.create_constant(&format!("{}({}!)",sign,index_int),
+															Tensor::<f64>::from_array(&[1,1],&[factorial]));
+				let term = nn.div_rank0(Rc::clone(&p), factorial_constant);
+				let label = "term_".to_string() + &counter.to_string();
+				term.borrow_mut().rename(&label);
+				tail_term = nn.add(tail_term, Rc::clone(&term));
+
+				let t = term.borrow().ref_signal()[vec![0,0]];
+				if t.abs() <= 1.0e-6 {
+					break;
+				}
+				counter += 1;
+				if counter >= 10000 {
+					break;
+				}
+			}
+			{
+				let diff = (tail_term.borrow().ref_signal()[vec![0,0]]-x0.sin()).abs();
+				println!("{} {}",
+						 tail_term.borrow().ref_signal()[vec![0,0]],
+						 x0.sin());
+				assert!(diff < 1.0e-5);
+			}
+
+			match nn.backward_propagating(0) {
+				Ok(_outputs) => {
+					let borrowed_x = x.borrow();
+					if let Some(ref g) = borrowed_x.ref_grad() {
+						let delta = 1.0e-5;
+						let diff = ((x0+delta).sin() - (x0-delta).sin())/(2.0*delta);
+						println!("gx {} {}",g.borrow(),diff);
+					}
+					else {
+						assert!(false);
+					}
+				},
+				Err(e) => {
+					println!("{}",e);
+					assert!(false)
+				}
+			}
+
+			if let Err(e) = nn.make_dot_graph(0,"sin_taylor_order0.dot") {
+				println!("{}",e);
+				assert!(false)
+			}
+
+			if let Err(e) = nn.make_dot_graph(1,"sin_taylor_order1.dot") {
+				println!("{}",e);
+				assert!(false)
+			}
 		}
 	}
 }

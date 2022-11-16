@@ -251,7 +251,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&output)],
 									  Synapse {
 										  forward: |inputs| {
-											  vec![Tensor::<T>::mul_rank0(inputs[0], inputs[1])]
+											  vec![Tensor::<T>::div_rank0(inputs[0], inputs[1])]
 										  },
 										  make_diff_node: |inputs, grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
