@@ -9,6 +9,7 @@ pub mod tensor_pow;
 pub mod tensor_square;
 pub mod tensor_exp;
 pub mod tensor_log;
+pub mod tensor_trigonometric;
 pub mod tensor_affine;
 
 pub use tensor_base::Tensor;
