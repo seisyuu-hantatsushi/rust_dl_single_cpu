@@ -261,7 +261,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 }
-
+/*
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -919,3 +919,4 @@ mod tests {
 		}
 	}
 }
+*/

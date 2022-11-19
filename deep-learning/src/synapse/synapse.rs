@@ -415,6 +415,49 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		(rs, output)
 	}
 
+	pub fn mul_rank0_rankn(s:NNNeuron<T>,x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		assert_eq!(s.borrow().shape(),&[1,1]);
+		let label = "mul_rank0_rankn";
+		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
+		let s = SynapseNode::<T>::new(&label,
+									  vec![Rc::clone(&s), Rc::clone(&x)],
+									  vec![Rc::clone(&output)],
+									  Synapse::<T>::new(
+										  |inputs| {
+											  vec![inputs[1].scale(inputs[0][vec![0,0]])]
+										  },
+										  |inputs,grads| {
+											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+
+											  if !inputs[0].borrow().is_constant() {
+												  let (sn,output) = Self::mul_rank0_rankn(Rc::clone(&grads[0]), Rc::clone(&inputs[0]));
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(output);
+													  }
+												  }
+											  }
+
+											  (sns,outputs)
+										  }
+									  ));
+		let rs = Rc::new(RefCell::new(s));
+		output.borrow_mut().set_generator(Rc::clone(&rs));
+		rs.borrow().forward();
+		(rs, output)
+	}
+
 	pub fn sin(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "sin";
 		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
@@ -467,7 +510,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		rs.borrow().forward();
 		(rs, output)
 	}
-	
+
     pub fn forward(&self) -> Vec<NNNeuron<T>> {
 		let inputs_holder = self.inputs.iter().map(|n| n.borrow()).collect::<Vec<Ref<'_,Neuron<T>>>>();
 		let inputs = inputs_holder.iter().map(|n| n.ref_signal()).collect::<Vec<&Tensor<T>>>();
