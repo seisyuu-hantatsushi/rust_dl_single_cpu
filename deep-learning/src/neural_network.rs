@@ -538,7 +538,7 @@ mod tests {
 						assert!(false)
 					}
 				}
-
+/*
 				if let Err(e) = nn.make_dot_graph(0,"graph2_order0.dot") {
 					println!("{}",e);
 					assert!(false)
@@ -563,6 +563,7 @@ mod tests {
 					println!("{}",e);
 					assert!(false)
 				}
+*/
 			}
 
 			{
@@ -576,11 +577,12 @@ mod tests {
 				let term3 = nn.mul_rank0(Rc::clone(&c2), term2);
 				let y = nn.sub(term1,term3);
 				y.borrow_mut().rename("y");
-
+/*
 				if let Err(e) = nn.make_dot_graph(0,"graph2.dot") {
 					println!("{}",e);
 					assert!(false)
 				}
+*/
 				fn func(x:f64) -> f64 {
 					x.powf(4.0) - 2.0 * x.powf(2.0)
 				}
@@ -624,7 +626,7 @@ mod tests {
 						assert!(false)
 					}
 				}
-
+/*
 				if let Err(e) = nn.make_dot_graph(0,"graph3_order0.dot") {
 					println!("{}",e);
 					assert!(false)
@@ -639,6 +641,7 @@ mod tests {
 					println!("{}",e);
 					assert!(false)
 				}
+*/
 			}
 		}
 
@@ -667,6 +670,8 @@ mod tests {
 						let delta = 1.0e-5;
 						let diff = (sphere(x0+delta,y0)-sphere(x0-delta,y0))/(2.0*delta);
 						println!("gx {} {}", g.borrow(), diff);
+						let gx = g.borrow().ref_signal()[vec![0,0]];
+						assert!((diff-gx).abs() <= delta);
 					}
 					else {
 						assert!(false);
@@ -676,6 +681,8 @@ mod tests {
 						let delta = 1.0e-5;
 						let diff = (sphere(x0,y0+delta)-sphere(x0,y0-delta))/(2.0*delta);
 						println!("gy {} {}", g.borrow(), diff);
+						let gy = g.borrow().ref_signal()[vec![0,0]];
+						assert!((diff-gy).abs() <= delta);
 					}
 					else {
 						assert!(false);
@@ -719,6 +726,8 @@ mod tests {
 						let delta = 1.0e-6;
 						let diff = (matyas(x0+delta,y0)-matyas(x0-delta,y0))/(2.0*delta);
 						println!("matyas gx {} {}", g.borrow(), diff);
+						let gx = g.borrow().ref_signal()[vec![0,0]];
+						assert!((diff-gx).abs() <= delta);
 					}
 					else {
 						assert!(false);
@@ -728,6 +737,8 @@ mod tests {
 						let delta = 1.0e-6;
 						let diff = (matyas(x0,y0+delta)-matyas(x0,y0-delta))/(2.0*delta);
 						println!("matyas gy {} {}", g.borrow(), diff);
+						let gy = g.borrow().ref_signal()[vec![0,0]];
+						assert!((diff-gy).abs() <= delta);
 					}
 					else {
 						assert!(false);
@@ -738,6 +749,7 @@ mod tests {
 					assert!(false)
 				}
 			}
+			println!("");
 		}
 
 		{
@@ -750,7 +762,7 @@ mod tests {
 			let c2  = nn.create_constant("2.0",  Tensor::<f64>::from_array(&[1,1],&[2.0]));
 			let c3  = nn.create_constant("3.0",  Tensor::<f64>::from_array(&[1,1],&[3.0]));
 			let c6  = nn.create_constant("6.0",  Tensor::<f64>::from_array(&[1,1],&[6.0]));
-			let c12 = nn.create_constant("12.0", Tensor::<f64>::from_array(&[1,1],&[12.0]));
+			let c12 = nn.create_constant("14.0", Tensor::<f64>::from_array(&[1,1],&[12.0]));
 			let c14 = nn.create_constant("14.0", Tensor::<f64>::from_array(&[1,1],&[14.0]));
 			let c18 = nn.create_constant("18.0", Tensor::<f64>::from_array(&[1,1],&[18.0]));
 			let c19 = nn.create_constant("19.0", Tensor::<f64>::from_array(&[1,1],&[19.0]));
@@ -761,48 +773,48 @@ mod tests {
 			let c48 = nn.create_constant("48.0", Tensor::<f64>::from_array(&[1,1],&[48.0]));
 
 			fn goldstein_price(x:f64,y:f64) -> f64 {
-				(1.0+(x + y + 1.0).powf(2.0) * (19.0 - 14.0*x + 3.0*x.powf(2.0) - 14.0*y + 6.0*x*y + 3.0*y.powf(2.0)))*
-					(30.0 + (2.0*x-3.0*y).powf(2.0)*(18.0 - 32.0*x + 12.0*x.powf(2.0) + 48.0*y - 36.0*x*y + 27.0*y.powf(2.0)))
+				(1.0 + (x + y + 1.0).powf(2.0)*(19.0 - 14.0*x + 3.0*x.powf(2.0) - 14.0*y + 6.0*x*y + 3.0*y.powf(2.0)))*(30.0 + (2.0*x-3.0*y).powf(2.0)*(18.0 - 32.0*x + 12.0*x.powf(2.0) + 48.0*y - 36.0*x*y + 27.0*y.powf(2.0)))
 			}
 
-			let term1  = nn.add(Rc::clone(&x),Rc::clone(&y));
-			let term2  = nn.add(Rc::clone(&c1),term1);
-			let term3  = nn.pow_rank0(term2,Rc::clone(&c2));
-			let term4  = nn.mul_rank0(Rc::clone(&c14),Rc::clone(&x));
-			let term5  = nn.sub(Rc::clone(&c19),term4); //19 - 14x
-			let term6  = nn.pow_rank0(Rc::clone(&x), Rc::clone(&c2)); //x^2
-			let term7  = nn.mul_rank0(Rc::clone(&c3), term6);//3*x^2
-			let term8  = nn.add(term5, term7);
-			let term9  = nn.mul_rank0(Rc::clone(&c14), Rc::clone(&y)); //14*y
-			let term10 = nn.sub(term8,term9);
-			let term11 = nn.mul_rank0(Rc::clone(&x),Rc::clone(&y));
-			let term12 = nn.mul_rank0(Rc::clone(&c6), term11);
-			let term13 = nn.add(term10, term12);
-			let term14 = nn.pow_rank0(Rc::clone(&y), Rc::clone(&c2));
-			let term15 = nn.mul_rank0(Rc::clone(&c3), term14);
-			let term16 = nn.add(term13,term15);
-			let term18 = nn.mul_rank0(term3,term16);
-			let left_term = nn.add(Rc::clone(&c1), term18);
-			let term1 = nn.mul_rank0(Rc::clone(&c2),Rc::clone(&x));
-			let term2 = nn.mul_rank0(Rc::clone(&c3),Rc::clone(&y));
-			let term3 = nn.sub(term1,term2);
-			let term4 = nn.pow_rank0(term3, Rc::clone(&c2));
-			let term5 = nn.mul_rank0(Rc::clone(&c32), Rc::clone(&x));
-			let term6 = nn.pow_rank0(Rc::clone(&x), Rc::clone(&c2));
-			let term7 = nn.mul_rank0(Rc::clone(&c12), term6);
-			let term  = nn.sub(c18,term5);
-			let term1 = nn.add(term, term7);
-			let term  = nn.mul_rank0(c48,Rc::clone(&y));
-			let term  = nn.add(term1, term);
-			let term  = nn.mul_rank0(term4,term);
-			let term1 = nn.mul_rank0(Rc::clone(&x), Rc::clone(&y));
-			let term2 = nn.mul_rank0(c36,term1);
-			let term  = nn.sub(term, term2);
-			let term1 = nn.pow_rank0(Rc::clone(&y), Rc::clone(&c2));
-			let term2 = nn.mul_rank0(c27, term1);
-			let term  = nn.add(term, term2);
-			let right_term = nn.add(Rc::clone(&c30), term);
-			let z = nn.mul_rank0(left_term, right_term);
+			let term   = nn.add(Rc::clone(&x),Rc::clone(&y));
+			let term1  = nn.add(Rc::clone(&c1),term);
+			let term2  = nn.pow_rank0(term1,Rc::clone(&c2));
+			let term3  = nn.mul_rank0(Rc::clone(&c14), Rc::clone(&x));
+			let term   = nn.sub(Rc::clone(&c19),term3);
+			let term1  = nn.pow_rank0(Rc::clone(&x), Rc::clone(&c2)); //x^2.0
+			let term3  = nn.mul_rank0(Rc::clone(&c3),term1); //3.0*(x^2.0)
+			let term   = nn.add(term, term3);
+			let term1  = nn.mul_rank0(Rc::clone(&c14), Rc::clone(&y));
+			let term   = nn.sub(term, term1);
+			let term1  = nn.mul_rank0(Rc::clone(&x), Rc::clone(&y));
+			let term1  = nn.mul_rank0(Rc::clone(&c6), term1);
+			let term   = nn.add(term, term1);
+			let term1  = nn.pow_rank0(Rc::clone(&y), Rc::clone(&c2));
+			let term1  = nn.mul_rank0(Rc::clone(&c3), term1);
+			let term   = nn.add(term, term1);
+			let term   = nn.mul_rank0(term2, term);
+			let term_l = nn.add(Rc::clone(&c1), term);
+			let term1  = nn.mul_rank0(Rc::clone(&c2), Rc::clone(&x));
+			let term2  = nn.mul_rank0(Rc::clone(&c3), Rc::clone(&y));
+			let term   = nn.sub(term1,term2);
+			let term1  = nn.pow_rank0(term, Rc::clone(&c2)); //(2.0*x-3.0*y)^2
+			let term   = nn.mul_rank0(Rc::clone(&c32), Rc::clone(&x));
+			let term   = nn.sub(c18, term);
+			let term2  = nn.pow_rank0(Rc::clone(&x), Rc::clone(&c2));
+			let term2  = nn.mul_rank0(Rc::clone(&c12), term2); //12*(x^2)
+			let term   = nn.add(term, term2);
+			let term2  = nn.mul_rank0(Rc::clone(&c48), Rc::clone(&y));
+			let term   = nn.add(term, term2);
+			let term2  = nn.mul_rank0(Rc::clone(&x), Rc::clone(&y));
+			let term2  = nn.mul_rank0(Rc::clone(&c36), term2);
+			let term   = nn.sub(term, term2);
+			let term2  = nn.pow_rank0(Rc::clone(&y), Rc::clone(&c2));
+			let term2  = nn.mul_rank0(Rc::clone(&c27), term2);
+			let term   = nn.add(term, term2);
+			let term   = nn.mul_rank0(term1,term);
+			let term_r = nn.add(Rc::clone(&c30),term);
+			let z = nn.mul_rank0(term_l, term_r);
+
 			z.borrow_mut().rename("z");
 			println!("gs {} \n{}", goldstein_price(x0, y0), z.borrow());
 
@@ -810,18 +822,22 @@ mod tests {
 				Ok(_outputs) => {
 					let borrowed_x = x.borrow();
 					if let Some(ref g) = borrowed_x.ref_grad() {
-						let delta = 1.0e-5;
+						let delta = 1.0e-6;
 						let diff = (goldstein_price(x0+delta,y0)-goldstein_price(x0-delta,y0))/(2.0*delta);
-						println!("gx {} {}", g.borrow(), diff);
+						println!("gs gx {} {}", g.borrow(), diff);
+						let gx = g.borrow().ref_signal()[vec![0,0]];
+						assert!((diff-gx).abs() <= delta);
 					}
 					else {
 						assert!(false);
 					};
 					let borrowed_y = y.borrow();
 					if let Some(ref g) = borrowed_y.ref_grad() {
-						let delta = 1.0e-5;
+						let delta = 1.0e-6;
 						let diff = (goldstein_price(x0,y0+delta)-goldstein_price(x0,y0-delta))/(2.0*delta);
-						println!("gy {} {}", g.borrow(), diff);
+						println!("gs gy {} {}", g.borrow(), diff);
+						let gy = g.borrow().ref_signal()[vec![0,0]];
+						assert!((diff-gy).abs() <= delta);
 					}
 					else {
 						assert!(false);
@@ -831,16 +847,6 @@ mod tests {
 					println!("{}",e);
 					assert!(false)
 				}
-			}
-
-			if let Err(e) = nn.make_dot_graph(0,"gs_order0.dot") {
-				println!("{}",e);
-				assert!(false)
-			}
-
-			if let Err(e) = nn.make_dot_graph(1,"gs_order1.dot") {
-				println!("{}",e);
-				assert!(false)
 			}
 		}
 
