@@ -1,5 +1,5 @@
 use num;
-use crate::tensor::tensor_base::{Tensor};
+use crate::tensor::tensor_base::Tensor;
 
 impl<T> Tensor<T>
 where T:num::Float+Clone+Copy {

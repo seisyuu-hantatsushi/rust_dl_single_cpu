@@ -258,7 +258,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 											  let (sn1,output) = Self::exp(Rc::clone(&inputs[0]));
 											  sns.push(sn1);
 											  outputs.push(Rc::clone(&output));
-											  let (sn2,output) = Self::mul_rank0(output,Rc::clone(&grads[0]));
+											  let (sn2,output) = Self::hadamard_product(output,Rc::clone(&grads[0]));
 											  sns.push(sn2);
 											  outputs.push(Rc::clone(&output));
 											  {
@@ -448,6 +448,20 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 														  outputs.push(Rc::clone(&grads[0]));
 														  l_output
 													  };
+													  outputs.push(Rc::clone(&output));
+													  {
+														  let mut n = inputs[0].borrow_mut();
+														  if let Some(ref g) = n.ref_grad() {
+															  outputs.push(Rc::clone(&g));
+															  let (sn, output) = Self::add(Rc::clone(&g), output);
+															  n.set_grad(Rc::clone(&output));
+															  sns.push(sn);
+															  outputs.push(output);
+														  }
+														  else {
+															  n.set_grad(output);
+														  }
+													  }
 												  }
 												  if !inputs[1].borrow().is_constant() {
 													  let output = if grads[0].borrow().is_constant() && inputs[0].borrow().is_constant() {
@@ -462,6 +476,20 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 														  outputs.push(Rc::clone(&grads[0]));
 														  l_output
 													  };
+													  outputs.push(Rc::clone(&output));
+													  {
+														  let mut n = inputs[1].borrow_mut();
+														  if let Some(ref g) = n.ref_grad() {
+															  outputs.push(Rc::clone(&g));
+															  let (sn, output) = Self::add(Rc::clone(&g), output);
+															  n.set_grad(Rc::clone(&output));
+															  sns.push(sn);
+															  outputs.push(output);
+														  }
+														  else {
+															  n.set_grad(output);
+														  }
+													  }
 												  }
 												  (sns,outputs)
 											  }
@@ -473,8 +501,8 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		(rs, output)
 	}
 
-	pub fn sin(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		let label = "sin";
+	pub fn tanh(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		let label = "tanh";
 		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
 
 		let s = SynapseNode::<T>::new(&label,
@@ -482,89 +510,55 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
 										  |inputs| {
-											  vec![inputs[0].sin()]
+											  vec![inputs[0].tanh()]
 										  },
 										  |inputs,grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  if !inputs[0].borrow().is_constant() {
-												  let (sn,output) = Self::cos(Rc::clone(&inputs[0]));
+												  let (sn,output) = Self::tanh(Rc::clone(&inputs[0]));
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  outputs.push(Rc::clone(&inputs[0]));
+												  let (sn,output) = Self::hadamard_product(Rc::clone(&output),output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  let one =
+													  nn_neuron_constant("1.0", Tensor::<T>::one(grads[0].borrow().shape()));
+												  outputs.push(Rc::clone(&one));
+												  let (sn,output) = Self::sub(one, output);
 												  sns.push(sn);
 												  outputs.push(Rc::clone(&output));
 												  let (sn,output) = Self::hadamard_product(Rc::clone(&grads[0]), output);
 												  sns.push(sn);
-												  outputs.push(Rc::clone(&output));
+												  outputs.push(Rc::clone(&grads[0]));
 												  {
 													  let mut n = inputs[0].borrow_mut();
-													  if let Some(ref g) = n.ref_grad() {
+													  let output = if let Some(ref g) = n.ref_grad() {
 														  outputs.push(Rc::clone(&g));
 														  let (sn, output) = Self::add(Rc::clone(&g), output);
 														  n.set_grad(Rc::clone(&output));
 														  sns.push(sn);
-														  outputs.push(output);
+														  output
 													  }
 													  else {
-														  n.set_grad(output);
-													  }
+														  n.set_grad(Rc::clone(&output));
+														  output
+													  };
+													  outputs.push(output);
 												  }
 											  }
 											  (sns,outputs)
 										  }
 									  ));
+
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
 		(rs, output)
 	}
 
-	pub fn cos(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		let label = "sin";
-		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
-
-		let s = SynapseNode::<T>::new(&label,
-									  vec![Rc::clone(&x)],
-									  vec![Rc::clone(&output)],
-									  Synapse::<T>::new(
-										  |inputs| {
-											  vec![inputs[0].cos()]
-										  },
-										  |inputs,grads| {
-											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
-											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
-											  if !inputs[0].borrow().is_constant() {
-												  let (sn,output) = Self::sin(Rc::clone(&inputs[0]));
-												  sns.push(sn);
-												  outputs.push(Rc::clone(&output));
-												  let (sn,output) = Self::neg(output);
-												  sns.push(sn);
-												  outputs.push(Rc::clone(&output));
-												  let (sn,output) = Self::hadamard_product(Rc::clone(&grads[0]), output);
-												  sns.push(sn);
-												  outputs.push(Rc::clone(&output));
-												  {
-													  let mut n = inputs[0].borrow_mut();
-													  if let Some(ref g) = n.ref_grad() {
-														  outputs.push(Rc::clone(&g));
-														  let (sn, output) = Self::add(Rc::clone(&g), output);
-														  n.set_grad(Rc::clone(&output));
-														  sns.push(sn);
-														  outputs.push(output);
-													  }
-													  else {
-														  n.set_grad(output);
-													  }
-												  }
-											  }
-											  (sns,outputs)
-										  }
-									  ));
-		let rs = Rc::new(RefCell::new(s));
-		output.borrow_mut().set_generator(Rc::clone(&rs));
-		rs.borrow().forward();
-		(rs, output)
-	}
-
-    pub fn forward(&self) -> Vec<NNNeuron<T>> {
+	pub fn forward(&self) -> Vec<NNNeuron<T>> {
 		let inputs_holder = self.inputs.iter().map(|n| n.borrow()).collect::<Vec<Ref<'_,Neuron<T>>>>();
 		let inputs = inputs_holder.iter().map(|n| n.ref_signal()).collect::<Vec<&Tensor<T>>>();
 		let outputs = (self.synapse.forward)(inputs);

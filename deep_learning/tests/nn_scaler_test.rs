@@ -4,7 +4,6 @@
 use std::fmt::Display;
 use std::rc::Rc;
 use std::error::Error;
-use num::ToPrimitive;
 
 use deep_learning::neural_network::NeuralNetwork;
 use linear_transform::Tensor;
@@ -548,10 +547,10 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 	let sin_xs = nn.sin(Rc::clone(&xs));
 	//println!("{}", sin_xs.borrow());
 
-	println!("sin_xs shape {:?}", sin_xs.borrow().shape());
+	//println!("sin_xs shape {:?}", sin_xs.borrow().shape());
 
 	let render_backend = BitMapBackend::new("sin_graph.png", (640, 480)).into_drawing_area();
-	render_backend.fill(&WHITE);
+	let _ = render_backend.fill(&WHITE);
 	let mut chart_builder = ChartBuilder::on(&render_backend)
 		.caption("sin(x)", ("sans-serif", 40).into_font())
 		.margin(5)
@@ -577,8 +576,8 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		match nn.backward_propagating(0) {
 			Ok(_outputs) => {
 				let borrowed_x = xs.borrow();
-				if let Some(ref g) = borrowed_x.ref_grad() {
-					println!("gx {}",g.borrow());
+				if let Some(ref _g) = borrowed_x.ref_grad() {
+					//println!("gx {}",g.borrow());
 				}
 				else {
 					return Err(Box::new(MyError::StringMsg("gx None".to_string())));
@@ -600,7 +599,6 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		};
 		let raw_grad_xs = grad_xs_holder.ref_signal().buffer();
 		let points = raw_xs.iter().zip(raw_grad_xs.iter());
-		println!("{:?}", points);
 		chart_builder
 			.draw_series(LineSeries::new(
 				points.map(|(x, sin_x)| (*x as f32, *sin_x as f32)),
@@ -616,8 +614,8 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		match nn.backward_propagating(1) {
 			Ok(_outputs) => {
 				let borrowed_x = xs.borrow();
-				if let Some(ref g) = borrowed_x.ref_grad() {
-					println!("gx {}",g.borrow());
+				if let Some(ref _g) = borrowed_x.ref_grad() {
+					//println!("gx {}",g.borrow());
 				}
 				else {
 					return Err(Box::new(MyError::StringMsg("gx None".to_string())));
@@ -639,7 +637,6 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		};
 		let raw_grad_xs = grad_xs_holder.ref_signal().buffer();
 		let points = raw_xs.iter().zip(raw_grad_xs.iter());
-		println!("{:?}", points);
 		chart_builder
 			.draw_series(LineSeries::new(
 				points.map(|(x, sin_x)| (*x as f32, *sin_x as f32)),
@@ -656,8 +653,8 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		match nn.backward_propagating(2) {
 			Ok(_outputs) => {
 				let borrowed_x = xs.borrow();
-				if let Some(ref g) = borrowed_x.ref_grad() {
-					println!("gx {}",g.borrow());
+				if let Some(ref _g) = borrowed_x.ref_grad() {
+					//println!("gx {}",g.borrow());
 				}
 				else {
 					return Err(Box::new(MyError::StringMsg("gx None".to_string())));
@@ -679,7 +676,6 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		};
 		let raw_grad_xs = grad_xs_holder.ref_signal().buffer();
 		let points = raw_xs.iter().zip(raw_grad_xs.iter());
-		println!("{:?}", points);
 		chart_builder
 			.draw_series(LineSeries::new(
 				points.map(|(x, sin_x)| (*x as f32, *sin_x as f32)),
@@ -696,5 +692,77 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		.draw()?;
 
 	render_backend.present()?;
+	Ok(())
+}
+
+#[test]
+fn tanh_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
+
+	let mut nn = NeuralNetwork::<f64>::new();
+	let x0 = 1.0;
+	let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
+	let y = nn.tanh(Rc::clone(&x));
+
+	let diff = 1.0f64.tanh() - y.borrow().ref_signal()[vec![0,0]];
+	println!("{} {}", 1.0f64.tanh(), y.borrow());
+	assert!(diff.abs() < 1.0e-5);
+
+	match nn.backward_propagating(0) {
+		Ok(_outputs) => {
+			let borrowed_x = x.borrow();
+			if let Some(ref g) = borrowed_x.ref_grad() {
+				let gx = g.borrow().ref_signal()[vec![0,0]];
+				let delta = 1.0e-6;
+				let diff = ((1.0f64+delta).tanh()-(1.0f64-delta).tanh())/(2.0*delta);
+				assert!((diff - gx).abs() < delta);
+				println!("1st order diff {} {}",gx,diff);
+			}
+			else {
+				return Err(Box::new(MyError::StringMsg("gx None".to_string())));
+			}
+		},
+		Err(e) => {
+			println!("{}",e);
+			assert!(false)
+		}
+	};
+
+	let _ = nn.clear_grads(0);
+	let _ = nn.clear_grads(1);
+	match nn.backward_propagating(1) {
+		Ok(_outputs) => {
+			let borrowed_x = x.borrow();
+			if let Some(ref g) = borrowed_x.ref_grad() {
+				let gx = g.borrow().ref_signal()[vec![0,0]];
+				let delta = 1.0e-6;
+				let diff = ((1.0f64+delta).tanh()+(1.0f64-delta).tanh()-2.0*1.0f64.tanh())/delta.powf(2.0);
+				println!("second order {} {}",gx,diff);
+				//assert!((diff - gx).abs() < delta);
+			}
+			else {
+				return Err(Box::new(MyError::StringMsg("gx None".to_string())));
+			}
+		},
+		Err(e) => {
+			println!("{}",e);
+			assert!(false)
+		}
+	};
+
+	if let Err(e) = nn.make_dot_graph(0,"tanh_taylor_order0.dot") {
+		println!("{}",e);
+		assert!(false)
+	}
+
+	if let Err(e) = nn.make_dot_graph(1,"tanh_taylor_order1.dot") {
+		println!("{}",e);
+		assert!(false)
+	}
+
+	if let Err(e) = nn.make_dot_graph(2,"tanh_taylor_order2.dot") {
+		println!("{}",e);
+		assert!(false)
+	}
+	
 	Ok(())
 }
