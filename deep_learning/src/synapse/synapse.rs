@@ -415,41 +415,56 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		(rs, output)
 	}
 
-	pub fn mul_rank0_rankn(s:NNNeuron<T>,x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		assert_eq!(s.borrow().shape(),&[1,1]);
-		let label = "mul_rank0_rankn";
+	pub fn hadamard_product(x:NNNeuron<T>,y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>){
+		assert_eq!(x.borrow().shape(),y.borrow().shape());
+		let label = "hadamard";
 		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
 		let s = SynapseNode::<T>::new(&label,
-									  vec![Rc::clone(&s), Rc::clone(&x)],
+									  vec![Rc::clone(&x), Rc::clone(&y)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
 										  |inputs| {
-											  vec![inputs[1].scale(inputs[0][vec![0,0]])]
+											  vec![Tensor::<T>::hadamard_product(inputs[0], inputs[1])]
 										  },
 										  |inputs,grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 
-											  if !inputs[0].borrow().is_constant() {
-												  let (sn,output) = Self::mul_rank0_rankn(Rc::clone(&grads[0]), Rc::clone(&inputs[0]));
-												  sns.push(sn);
-												  outputs.push(Rc::clone(&output));
-												  {
-													  let mut n = inputs[0].borrow_mut();
-													  if let Some(ref g) = n.ref_grad() {
-														  outputs.push(Rc::clone(&g));
-														  let (sn, output) = Self::add(Rc::clone(&g), output);
-														  n.set_grad(Rc::clone(&output));
-														  sns.push(sn);
-														  outputs.push(output);
+											  if inputs[0].borrow().is_constant() &&
+												 inputs[1].borrow().is_constant() {
+												  (sns,outputs)
+											  }
+											  else {
+												  if !inputs[0].borrow().is_constant() {
+													  let output = if grads[0].borrow().is_constant() && inputs[1].borrow().is_constant() {
+														  let t = Tensor::<T>::hadamard_product(grads[0].borrow().ref_signal(),inputs[1].borrow().ref_signal());
+														  let label = "(".to_string() + grads[0].borrow().name() + ") * (" + inputs[1].borrow().name() + ")";
+														  nn_neuron_constant(&label, t)
 													  }
 													  else {
-														  n.set_grad(output);
-													  }
+														  let (l_sn, l_output) = Self::hadamard_product(Rc::clone(&grads[0]), Rc::clone(&inputs[1]));
+														  sns.push(l_sn);
+														  outputs.push(Rc::clone(&inputs[1]));
+														  outputs.push(Rc::clone(&grads[0]));
+														  l_output
+													  };
 												  }
+												  if !inputs[1].borrow().is_constant() {
+													  let output = if grads[0].borrow().is_constant() && inputs[0].borrow().is_constant() {
+														  let t = Tensor::<T>::hadamard_product(grads[0].borrow().ref_signal(),inputs[0].borrow().ref_signal());
+														  let label = "(".to_string() + grads[0].borrow().name() + ") * (" + inputs[0].borrow().name() + ")";
+														  nn_neuron_constant(&label, t)
+													  }
+													  else {
+														  let (l_sn, l_output) = Self::hadamard_product(Rc::clone(&grads[0]), Rc::clone(&inputs[0]));
+														  sns.push(l_sn);
+														  outputs.push(Rc::clone(&inputs[0]));
+														  outputs.push(Rc::clone(&grads[0]));
+														  l_output
+													  };
+												  }
+												  (sns,outputs)
 											  }
-
-											  (sns,outputs)
 										  }
 									  ));
 		let rs = Rc::new(RefCell::new(s));
@@ -472,10 +487,27 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  |inputs,grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
-											  let (sn,output) = Self::cos(Rc::clone(&inputs[0]));
-											  sns.push(sn);
-											  outputs.push(output);
-											  //let (sn,output) = Self::mul_rank
+											  if !inputs[0].borrow().is_constant() {
+												  let (sn,output) = Self::cos(Rc::clone(&inputs[0]));
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  let (sn,output) = Self::hadamard_product(Rc::clone(&grads[0]), output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(output);
+													  }
+												  }
+											  }
 											  (sns,outputs)
 										  }
 									  ));
@@ -499,9 +531,30 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 										  |inputs,grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
-											  let (sn,output) = Self::sin(Rc::clone(&inputs[0]));
-											  sns.push(sn);
-											  outputs.push(output);
+											  if !inputs[0].borrow().is_constant() {
+												  let (sn,output) = Self::sin(Rc::clone(&inputs[0]));
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  let (sn,output) = Self::neg(output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  let (sn,output) = Self::hadamard_product(Rc::clone(&grads[0]), output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  outputs.push(output);
+													  }
+													  else {
+														  n.set_grad(output);
+													  }
+												  }
+											  }
 											  (sns,outputs)
 										  }
 									  ));
