@@ -1,6 +1,6 @@
 use num;
 
-use crate::tensor::tensor_base::{Tensor};
+use crate::tensor::tensor_base::Tensor;
 
 impl<T> Tensor<T>
 where T:num::Num+Clone+Copy {
@@ -10,4 +10,3 @@ where T:num::Num+Clone+Copy {
 	Tensor::from_vector(self.shape().to_vec(), v)
     }
 }
-
