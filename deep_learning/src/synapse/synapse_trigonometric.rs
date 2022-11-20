@@ -3,7 +3,7 @@ use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
-use crate::synapse::{Synapse,SynapseNode,NNSynapseNode};
+use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
 use crate::neuron::{NNNeuron,nn_neuron_new};
 
 impl<T> SynapseNode<T>
@@ -16,10 +16,10 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
-										  |inputs| {
+										  |inputs,_opt| {
 											  vec![inputs[0].sin()]
 										  },
-										  |inputs,grads| {
+										  |inputs,grads,_opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  if !inputs[0].borrow().is_constant() {
@@ -60,10 +60,10 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
-										  |inputs| {
+										  |inputs,_opt| {
 											  vec![inputs[0].cos()]
 										  },
-										  |inputs,grads| {
+										  |inputs,grads,_opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  if !inputs[0].borrow().is_constant() {

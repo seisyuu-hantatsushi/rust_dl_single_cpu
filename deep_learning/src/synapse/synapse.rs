@@ -6,22 +6,45 @@ use linear_transform::tensor::Tensor;
 
 use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
-pub type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>, grads: &Vec<NNNeuron<T>>) -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>);
+pub enum SynapseOption {
+	BroadcastTo(Vec<usize>)
+}
+
+pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption>)
+							  -> Vec<Tensor<T>>;
+pub type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>,
+							   grads: &Vec<NNNeuron<T>>,
+							   synapse_opt: &Option<SynapseOption>)
+							   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>);
 
 pub struct Synapse<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
-	forward: fn (inputs: Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-	make_diff_node: MakeDiffNode<T>
+	forward: ForwardProp<T>,
+	make_diff_node: MakeDiffNode<T>,
+	synapse_opt: Option<SynapseOption>
 }
 
 impl<T> Synapse<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
-	pub fn new(forward: fn (inputs: Vec<&Tensor<T>>) -> Vec<Tensor<T>>,
-		   make_diff_node: MakeDiffNode<T> ) -> Synapse<T> {
+	pub fn new(forward: ForwardProp<T>,
+			   make_diff_node: MakeDiffNode<T> ) -> Synapse<T> {
 		Synapse {
 			forward,
-			make_diff_node
+			make_diff_node,
+			synapse_opt: None
 		}
+	}
+	pub fn new_with_option(forward: ForwardProp<T>,
+						   make_diff_node: MakeDiffNode<T>,
+						   opt: Option<SynapseOption>) -> Synapse<T> {
+		Synapse {
+			forward,
+			make_diff_node,
+			synapse_opt: opt
+		}
+	}
+	pub fn ref_option(&self) -> &Option<SynapseOption> {
+		&self.synapse_opt
 	}
 }
 
@@ -93,17 +116,16 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 	pub fn neg(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		//let label = "-".to_string()+x.borrow().name();
 		let label = "neg";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
-									  Synapse {
-										  forward: |inputs| {
+									  Synapse::<T>:: new(
+										  |inputs, _opt| {
 											  vec![inputs[0].neg()]
 										  },
-										  make_diff_node: |inputs, grads| {
+										  |inputs, grads, _opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  let mut linked_grad = false;
@@ -137,8 +159,8 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 												  outputs.push(Rc::clone(&grads[0]))
 											  }
 											  (sns,outputs)
-										  }
-									  });
+										  })
+									  );
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
@@ -151,11 +173,11 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x),Rc::clone(&y)],
 									  vec![Rc::clone(&output)],
-									  Synapse {
-										  forward: |inputs| {
+									  Synapse::<T>::new(
+										  |inputs, _opt| {
 											  vec![inputs[0] + inputs[1]]
 										  },
-										  make_diff_node: |inputs, grads| {
+										  |inputs, grads, _opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  outputs.push(Rc::clone(&grads[0]));
@@ -175,8 +197,8 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 												  }
 											  }
 											  (sns,outputs)
-										  }
-									  });
+										  })
+									  );
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
@@ -184,17 +206,16 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	}
 
 	pub fn sub(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
-		//let label = "(".to_string()+x.borrow().name() + "-" + y.borrow().name() +")";
 		let label = "sub";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x),Rc::clone(&y)],
 									  vec![Rc::clone(&output)],
-									  Synapse {
-										  forward: |inputs| {
+									  Synapse::<T>::new(
+										  |inputs, _opt| {
 											  vec![(inputs[0] - inputs[1])]
 										  },
-										  make_diff_node: |inputs, grads| {
+										  |inputs, grads, _opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  let mut input_grad = false;
@@ -232,9 +253,8 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 											  if input_grad {
 												  outputs.push(Rc::clone(&grads[0]));
 											  }
-											  (sns,outputs)
-										  }
-									  });
+											 (sns,outputs)
+										  }));
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
@@ -248,11 +268,11 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
-									  Synapse {
-										  forward: |inputs| {
+									  Synapse::<T>::new(
+										  |inputs, _opt| {
 											  inputs.iter().map(|i| i.exp()).collect()
 										  },
-										  make_diff_node: |inputs, grads| {
+										  |inputs, grads, _opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  let (sn1,output) = Self::exp(Rc::clone(&inputs[0]));
@@ -275,8 +295,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 												  }
 											  }
 											  (sns,outputs)
-										  }
-									  });
+										  }));
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
@@ -291,11 +310,11 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&a),Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
-									  Synapse {
-										  forward: |inputs| {
+									  Synapse::<T>::new(
+										  |inputs, _opts| {
 											  vec![inputs[0].pow_rank0(inputs[1][vec![0,0]])]
 										  },
-										  make_diff_node: |inputs, grads| {
+										  |inputs, grads, _opts| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  if !inputs[0].borrow().is_constant() {
@@ -363,8 +382,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 												  }
 											  }
 											  (sns,outputs)
-										  }
-									  });
+										  }));
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
@@ -377,11 +395,11 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		let s = SynapseNode::<T>::new(&label,
 									  vec![Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
-									  Synapse {
-										  forward: |inputs| {
+									  Synapse::<T>::new(
+										  |inputs, _opt| {
 											  vec![inputs[0].ln()]
 										  },
-										  make_diff_node: |inputs, grads| {
+										  |inputs, grads, _opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  // (ln x)' = 1/x
@@ -407,8 +425,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 												  }
 											  }
 											  (sns,outputs)
-										  }
-									  });
+										  }));
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
@@ -423,10 +440,10 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&x), Rc::clone(&y)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
-										  |inputs| {
+										  |inputs,_opt| {
 											  vec![Tensor::<T>::hadamard_product(inputs[0], inputs[1])]
 										  },
-										  |inputs,grads| {
+										  |inputs,grads,_opt| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 
@@ -509,8 +526,65 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&x)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
-										  |inputs| {
+										  |inputs,_opt| {
 											  vec![inputs[0].tanh()]
+										  },
+										  |inputs,grads,_opt| {
+											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+											  if !inputs[0].borrow().is_constant() {
+												  let (sn,output) = Self::tanh(Rc::clone(&inputs[0]));
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  outputs.push(Rc::clone(&inputs[0]));
+												  let (sn,output) = Self::hadamard_product(Rc::clone(&output),output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  let one =
+													  nn_neuron_constant("1.0", Tensor::<T>::one(grads[0].borrow().shape()));
+												  outputs.push(Rc::clone(&one));
+												  let (sn,output) = Self::sub(one, output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&output));
+												  let (sn,output) = Self::hadamard_product(Rc::clone(&grads[0]), output);
+												  sns.push(sn);
+												  outputs.push(Rc::clone(&grads[0]));
+												  {
+													  let mut n = inputs[0].borrow_mut();
+													  let output = if let Some(ref g) = n.ref_grad() {
+														  outputs.push(Rc::clone(&g));
+														  let (sn, output) = Self::add(Rc::clone(&g), output);
+														  n.set_grad(Rc::clone(&output));
+														  sns.push(sn);
+														  output
+													  }
+													  else {
+														  n.set_grad(Rc::clone(&output));
+														  output
+													  };
+													  outputs.push(output);
+												  }
+											  }
+											  (sns,outputs)
+										  }
+									  ));
+
+		let rs = Rc::new(RefCell::new(s));
+		output.borrow_mut().set_generator(Rc::clone(&rs));
+		rs.borrow().forward();
+		(rs, output)
+	}
+
+	/*
+	pub fn sum(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		let label = "sum";
+		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
+		let s = SynapseNode::<T>::new(&label,
+									  vec![Rc::clone(&x)],
+									  vec![Rc::clone(&output)],
+									  Synapse::<T>::new(
+										  |inputs| {
+											  vec![inputs[0].sum()]
 										  },
 										  |inputs,grads| {
 											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
@@ -557,18 +631,19 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		rs.borrow().forward();
 		(rs, output)
 	}
+	 */
 
 	pub fn forward(&self) -> Vec<NNNeuron<T>> {
 		let inputs_holder = self.inputs.iter().map(|n| n.borrow()).collect::<Vec<Ref<'_,Neuron<T>>>>();
 		let inputs = inputs_holder.iter().map(|n| n.ref_signal()).collect::<Vec<&Tensor<T>>>();
-		let outputs = (self.synapse.forward)(inputs);
+		let outputs = (self.synapse.forward)(inputs, self.synapse.ref_option());
 		self.outputs.iter().zip(outputs.into_iter()).map(|(n,t)| {n.borrow_mut().assign(t); Rc::clone(n)}).collect()
     }
 
     pub fn make_diff_node(&self) -> (Vec<NNSynapseNode<T>>, Vec<NNNeuron<T>>) {
 		let grads =
 			self.outputs.iter().map(|no| no.borrow_mut().get_grad()).collect();
-		(self.synapse.make_diff_node)(&self.inputs, &grads)
+		(self.synapse.make_diff_node)(&self.inputs, &grads, self.synapse.ref_option())
     }
 
 }

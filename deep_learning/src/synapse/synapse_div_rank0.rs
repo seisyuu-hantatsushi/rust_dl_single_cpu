@@ -4,7 +4,7 @@ use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
-use crate::synapse::{Synapse,SynapseNode,NNSynapseNode};
+use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
 use crate::neuron::{NNNeuron,nn_neuron_new,nn_neuron_constant};
 
 impl<T> SynapseNode<T>
@@ -18,10 +18,10 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&x),Rc::clone(&y)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
-										  |inputs| {
+										  |inputs,_opt| {
 											  vec![Tensor::<T>::div_rank0(inputs[0], inputs[1])]
 										  },
-										  |inputs, grads| {
+										  |inputs, grads, _opt| {
 										  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 											  if !inputs[0].borrow().is_constant() {

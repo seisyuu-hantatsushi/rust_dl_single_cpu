@@ -4,13 +4,15 @@ use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
-use crate::synapse::{Synapse,SynapseNode,NNSynapseNode};
+use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
 use crate::neuron::{NNNeuron,nn_neuron_new,nn_neuron_constant};
 
 impl<T> SynapseNode<T>
 where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 
-	fn mul_rank0_make_diff_node(inputs: &Vec<NNNeuron<T>>, grads: &Vec<NNNeuron<T>>) -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
+	fn mul_rank0_make_diff_node(inputs: &Vec<NNNeuron<T>>,
+								grads: &Vec<NNNeuron<T>>,
+								_opt:&Option<SynapseOption>) -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 
@@ -95,7 +97,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 									  vec![Rc::clone(&x),Rc::clone(&y)],
 									  vec![Rc::clone(&output)],
 									  Synapse::<T>::new(
-										  |inputs| {
+										  |inputs,_opt| {
 											  vec![Tensor::<T>::mul_rank0(inputs[0], inputs[1])]
 										  },
 										  Self::mul_rank0_make_diff_node));
