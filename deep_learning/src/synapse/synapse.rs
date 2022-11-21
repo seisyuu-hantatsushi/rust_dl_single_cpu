@@ -7,7 +7,8 @@ use linear_transform::tensor::Tensor;
 use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
 pub enum SynapseOption {
-	BroadcastTo(Vec<usize>)
+	BroadcastTo(Vec<usize>),
+	Reshape(Vec<usize>)
 }
 
 pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption>)
@@ -36,11 +37,11 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 	}
 	pub fn new_with_option(forward: ForwardProp<T>,
 						   make_diff_node: MakeDiffNode<T>,
-						   opt: Option<SynapseOption>) -> Synapse<T> {
+						   opt: SynapseOption) -> Synapse<T> {
 		Synapse {
 			forward,
 			make_diff_node,
-			synapse_opt: opt
+			synapse_opt: Some(opt)
 		}
 	}
 	pub fn ref_option(&self) -> &Option<SynapseOption> {
@@ -113,6 +114,58 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 
 	pub fn outputs(&self) -> &Vec<Rc<RefCell<Neuron<T>>>> {
 		&self.outputs
+	}
+
+	pub fn reshape(x:NNNeuron<T>, shape:Vec<usize>) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		let num_of_elements = x.borrow().ref_signal().buffer().len();
+		let num_of_reshape_elements = shape.iter().fold(1,|prod,d| prod * (*d));
+		assert_eq!(num_of_elements, num_of_reshape_elements);
+		let label = "reshape";
+		let output = nn_neuron_new(&label, Tensor::<T>::zero(&shape));
+		let s = Synapse::<T>::new_with_option(
+			|inputs, opt| {
+				let dst_shape = if let Some(o) = opt {
+					if let SynapseOption::Reshape(s) = o {
+						s
+					}
+					else {
+						panic!("Invalid Option")
+					}
+				}
+				else {
+					panic!("Invalid Option")
+				};
+				vec![inputs[0].reshape(&dst_shape)]
+			},
+			|inputs, grads, _|{
+				let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+				let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+				if !inputs[0].borrow().is_constant() {
+					let (sn,output) = Self::reshape(Rc::clone(&grads[0]),
+													inputs[0].borrow().ref_signal().shape().to_vec());
+					sns.push(sn);
+					outputs.push(Rc::clone(&output));
+					let mut n = inputs[0].borrow_mut();
+					if let Some(ref g) = n.ref_grad() {
+						outputs.push(Rc::clone(&g));
+						let (sn, output) = Self::add(Rc::clone(&g), output);
+						n.set_grad(Rc::clone(&output));
+						sns.push(Rc::clone(&sn));
+						outputs.push(output);
+					}
+					else {
+						n.set_grad(output)
+					}
+				}
+				(sns, outputs)
+			},
+			SynapseOption::Reshape(shape)
+		);
+		let sn = SynapseNode::<T>::new(&label,vec![Rc::clone(&x)],vec![Rc::clone(&output)], s);
+		let rsn = Rc::new(RefCell::new(sn));
+		output.borrow_mut().set_generator(Rc::clone(&rsn));
+		rsn.borrow().forward();
+		(rsn, output)
 	}
 
 	pub fn neg(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {

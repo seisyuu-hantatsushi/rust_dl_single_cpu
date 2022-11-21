@@ -4,7 +4,7 @@ use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
-use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
+use crate::synapse::{Synapse,SynapseNode,NNSynapseNode};
 use crate::neuron::{NNNeuron,nn_neuron_new,nn_neuron_constant};
 
 impl<T> SynapseNode<T>
