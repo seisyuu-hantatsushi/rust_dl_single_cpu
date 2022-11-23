@@ -1,6 +1,5 @@
 /* -*- tab-width:4 -*- */
 
-
 use std::fmt::Display;
 use std::rc::Rc;
 use std::error::Error;
@@ -388,6 +387,7 @@ fn goldstein_price_test() {
 }
 
 #[test]
+#[ignore]
 fn second_order_diff() {
 	let mut nn = NeuralNetwork::<f64>::new();
 	let x0 = 2.0;
@@ -696,6 +696,7 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 }
 
 #[test]
+#[ignore]
 fn tanh_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 
 	let mut nn = NeuralNetwork::<f64>::new();

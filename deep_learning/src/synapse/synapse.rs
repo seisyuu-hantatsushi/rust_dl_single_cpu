@@ -8,7 +8,7 @@ use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
 pub enum SynapseOption {
 	BroadcastTo(Vec<usize>),
-	Reshape(Vec<usize>)
+	Reshape((Vec<usize>,Vec<usize>))
 }
 
 pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption>)
@@ -116,17 +116,18 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		&self.outputs
 	}
 
-	pub fn reshape(x:NNNeuron<T>, shape:Vec<usize>) -> (NNSynapseNode<T>,NNNeuron<T>) {
+	pub fn reshape(x:NNNeuron<T>, dst_shape:Vec<usize>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let num_of_elements = x.borrow().ref_signal().buffer().len();
-		let num_of_reshape_elements = shape.iter().fold(1,|prod,d| prod * (*d));
+		let num_of_reshape_elements = dst_shape.iter().fold(1,|prod,d| prod * (*d));
 		assert_eq!(num_of_elements, num_of_reshape_elements);
 		let label = "reshape";
-		let output = nn_neuron_new(&label, Tensor::<T>::zero(&shape));
+		let src_shape = x.borrow().ref_signal().shape().to_vec();
+		let output = nn_neuron_new(&label, Tensor::<T>::zero(&dst_shape));
 		let s = Synapse::<T>::new_with_option(
 			|inputs, opt| {
 				let dst_shape = if let Some(o) = opt {
-					if let SynapseOption::Reshape(s) = o {
-						s
+					if let SynapseOption::Reshape((_s,d)) = o {
+						d
 					}
 					else {
 						panic!("Invalid Option")
@@ -137,12 +138,21 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 				};
 				vec![inputs[0].reshape(&dst_shape)]
 			},
-			|inputs, grads, _|{
+			|inputs, grads, opt|{
 				let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 				let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+				let (src_shape, _dst_shape) = if let Some(o) = opt {
+					match o {
+						SynapseOption::Reshape(s) => s,
+						_ => panic!("invalid option")
+					}
+				}
+				else {
+					panic!("reshape must have option of itself")
+				};
+
 				if !inputs[0].borrow().is_constant() {
-					let (sn,output) = Self::reshape(Rc::clone(&grads[0]),
-													inputs[0].borrow().ref_signal().shape().to_vec());
+					let (sn,output) = Self::reshape(Rc::clone(&grads[0]), src_shape.clone());
 					sns.push(sn);
 					outputs.push(Rc::clone(&output));
 					let mut n = inputs[0].borrow_mut();
@@ -159,7 +169,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 				}
 				(sns, outputs)
 			},
-			SynapseOption::Reshape(shape)
+			SynapseOption::Reshape((src_shape, dst_shape))
 		);
 		let sn = SynapseNode::<T>::new(&label,vec![Rc::clone(&x)],vec![Rc::clone(&output)], s);
 		let rsn = Rc::new(RefCell::new(sn));

@@ -177,6 +177,13 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		nn
 	}
 
+	pub fn reshape(&mut self, x:NNNeuron<T>, shape:Vec<usize>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::reshape(x,shape);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn add(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::add(x,y);
 		self.cg_order[0].append_nodes(vec![sn]);
