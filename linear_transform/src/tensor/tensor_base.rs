@@ -157,13 +157,6 @@ where T:num::Num+Clone+Copy {
 	*e = value;
     }
 
-    pub fn reshape(&self, shape:&[usize]) -> Tensor<T> {
-	assert_eq!(self.v.len(), shape.iter().fold(1,|prod,d| { prod * (*d) }));
-	Tensor {
-	    shape: shape.to_vec(),
-	    v: self.v.clone()
-	}
-    }
 }
 
 impl<T> Tensor<T>
