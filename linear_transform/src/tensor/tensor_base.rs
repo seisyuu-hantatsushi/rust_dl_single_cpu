@@ -133,6 +133,18 @@ where T:num::Num+Clone+Copy {
 	}
     }
 
+    pub fn new_set_value(shape:&[usize], x:T) -> Tensor<T> {
+	let size = shape.iter().fold(1,|prod,&x| prod*x);
+	let mut v:Vec<T> = Vec::with_capacity(size);
+	for _ in 0..size {
+	    v.push(x)
+	}
+	Tensor {
+	    shape: shape.to_vec(),
+	    v: v.into_boxed_slice()
+	}
+    }
+
     pub fn from_array<'a>(shape:&'a [usize], elements:&'a [T]) -> Tensor<T> {
 	let product = shape.iter().fold(1,|prod, x| prod * (*x));
 	assert_eq!(product, elements.len());
