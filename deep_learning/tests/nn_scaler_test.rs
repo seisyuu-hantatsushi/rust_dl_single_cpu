@@ -88,7 +88,7 @@ fn high_order_diff() {
 		Ok(outputs) => {
 			for output in outputs.iter() {
 				println!("gx4 {}",output.borrow());
-S			}
+			}
 		},
 		Err(e) => {
 			println!("{}",e);
