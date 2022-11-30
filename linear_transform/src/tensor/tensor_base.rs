@@ -155,7 +155,7 @@ where T:num::Num+Clone+Copy {
     }
 
     pub fn from_vector<'a>(shape:Vec<usize>, elements:Vec<T>) -> Tensor<T> {
-	let product = shape.iter().fold(1,|prod, x| prod * (*x));
+	let product = shape.iter().fold(1,|prod, &x| prod * x);
 	assert_eq!(product, elements.len());
 	Tensor {
 	    shape: shape,

@@ -106,10 +106,11 @@ where T:num::Num+Clone+Copy {
     fn broadcast_subtensor(v:&[T],
 			   src_shape:&[usize],
 			   dst_shape:&[usize]) -> Vec<T> {
+	//println!("broadcast subtensor {:?} {:?}",src_shape,dst_shape);
 	let v = if src_shape.len() > 1 {
 	    let mut broadcasted_v:Vec<T> = Vec::new();
 	    if src_shape[0] == 1 {
-		for _ in 0..dst_shape[0] {
+		for s in 0..dst_shape[0] {
 		    broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
 		}
 	    }
@@ -122,7 +123,17 @@ where T:num::Num+Clone+Copy {
 	    broadcasted_v
 	}
 	else {
-	    v.to_vec()
+	    assert!(dst_shape[0] % src_shape[0] == 0);
+	    if dst_shape[0] != src_shape[0] {
+		let mut broadcasted_v:Vec<T> = Vec::new();
+		for s in 0..dst_shape[0] {
+		    broadcasted_v.extend(v);
+		}
+		broadcasted_v
+	    }
+	    else {
+		v.to_vec()
+	    }
 	};
 	v
     }
@@ -140,7 +151,6 @@ where T:num::Num+Clone+Copy {
 	let v = Self::broadcast_subtensor(self.buffer(), &src_shape, &dst_shape);
 	Tensor::from_vector(dst_shape.to_vec(), v)
     }
-
 }
 
 #[test]
