@@ -1,3 +1,4 @@
+/* -*- tab-width:4 -*- */
 use num;
 
 use crate::tensor::tensor_base::Tensor;
@@ -126,7 +127,7 @@ where T:num::Num+Clone+Copy {
 	    assert!(dst_shape[0] % src_shape[0] == 0);
 	    if dst_shape[0] != src_shape[0] {
 		let mut broadcasted_v:Vec<T> = Vec::new();
-		for s in 0..dst_shape[0] {
+		for _ in 0..dst_shape[0] {
 		    broadcasted_v.extend(v);
 		}
 		broadcasted_v
