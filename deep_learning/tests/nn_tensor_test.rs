@@ -89,12 +89,32 @@ fn sum_to_test() -> Result<(),Box<dyn std::error::Error>> {
 
 #[test]
 fn broadcast_to_test() -> Result<(),Box<dyn std::error::Error>> {
-	let mut nn = NeuralNetwork::<f64>::new();
-	let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[2,3],&[1.0,2.0,3.0,4.0,5.0,6.0]));
-	let a = nn.create_neuron("a", Tensor::<f64>::from_array(&[1,1],&[10.0]));
-	let y = nn.add(a,x);
+	{
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[2,3],&[1.0,2.0,3.0,4.0,5.0,6.0]));
+		let a = nn.create_neuron("a", Tensor::<f64>::from_array(&[1,1],&[10.0]));
+		let y = nn.add(Rc::clone(&a),Rc::clone(&x));
 
-	println!("{}", y.borrow());
+		println!("y {}", y.borrow());
+		nn.backward_propagating(0)?;
 
+		let borrowed_x = x.borrow();
+		if let Some(ref gx) = borrowed_x.ref_grad() {
+			println!("gx {}",gx.borrow().ref_signal());
+			//assert_eq!(gx.borrow().ref_signal(), &Tensor::<f64>::one(&[2,3]));
+		}
+		else {
+			assert!(false);
+		}
+
+		let borrowed_a = a.borrow();
+		if let Some(ref ga) = borrowed_a.ref_grad() {
+			println!("ga {}",ga.borrow().ref_signal());
+			//assert_eq!(gx.borrow().ref_signal(), &Tensor::<f64>::one(&[2,3]));
+		}
+		else {
+			assert!(false);
+		}
+	}
 	Ok(())
 }
