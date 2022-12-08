@@ -240,6 +240,13 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		output
 	}
 
+	pub fn hadamard_product(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::hadamard_product(x,y);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn sin(&mut self, x:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::sin(x);
 		self.cg_order[0].append_nodes(vec![sn]);

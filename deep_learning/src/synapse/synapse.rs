@@ -7,7 +7,6 @@ use linear_transform::tensor::Tensor;
 use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
 pub enum SynapseOption {
-	Add((Vec<usize>,Vec<usize>)),
 	BroadcastTo((Vec<usize>,Vec<usize>)),
 	Reshape((Vec<usize>,Vec<usize>)),
 	Sum((Vec<usize>,Vec<usize>))
@@ -173,29 +172,18 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn add(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "add";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
-		let src_shape = x.borrow().shape().to_vec();
-		let dst_shape = y.borrow().shape().to_vec();
-		let s = Synapse::<T>::new_with_option(
-			|inputs, opt| {
-				let (left_shape, right_shape) = if let Some(o) = opt {
-					if let SynapseOption::Add(o) = o {
-						o
-					}
-					else {
-						panic!("Invalid option");
-					}
-				}
-				else {
-					panic!("no option");
-				};
+		let s = Synapse::<T>::new(
+			|inputs, _opt| {
+				let left_shape  = inputs[0].shape().to_vec();
+				let right_shape = inputs[1].shape().to_vec();
 				let left_prod  = left_shape.iter().fold(1, |prod, &e| { prod * e });
 				let right_prod = right_shape.iter().fold(1, |prod, &e| { prod * e });
 				if left_prod < right_prod {
-					let expand_left = inputs[0].broadcast(right_shape);
+					let expand_left = inputs[0].broadcast(&right_shape);
 					vec![expand_left + inputs[1]]
 				}
 				else if left_prod > right_prod {
-					let expand_right = inputs[1].broadcast(left_shape);
+					let expand_right = inputs[1].broadcast(&left_shape);
 					vec![inputs[0] + expand_right]
 				}
 				else {
@@ -262,8 +250,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 					}
 				}
 				(sns,outputs)
-			},
-			SynapseOption::Add((src_shape,dst_shape)));
+			});
 		let sn = SynapseNode::<T>::new(&label,
 									   vec![Rc::clone(&x),Rc::clone(&y)],
 									   vec![Rc::clone(&output)],
@@ -278,57 +265,98 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn sub(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "sub";
 		let output = Rc::new(RefCell::new(Neuron::<T>::new(&label, Tensor::<T>::zero(&[1,1]))));
-		let s = SynapseNode::<T>::new(&label,
-									  vec![Rc::clone(&x),Rc::clone(&y)],
-									  vec![Rc::clone(&output)],
-									  Synapse::<T>::new(
-										  |inputs, _opt| {
-											  vec![(inputs[0] - inputs[1])]
-										  },
-										  |inputs, grads, _opt| {
-											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
-											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
-											  let mut input_grad = false;
-											  let mut n = inputs[0].borrow_mut();
-											  if !n.is_constant() {
-												  if let Some(ref g) = n.ref_grad() {
-													  outputs.push(Rc::clone(&g));
-													  let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&grads[0]));
-													  n.set_grad(Rc::clone(&output));
-													  sns.push(sn);
-													  outputs.push(output);
-													  input_grad = true;
-												  }
-												  else {
-													  n.set_grad(Rc::clone(&grads[0]));
-												  }
-											  }
+		let s = Synapse::<T>::new(
+			|inputs, _opt| {
+				let left_shape = inputs[0].shape().to_vec();
+				let right_shape = inputs[1].shape().to_vec();
+				let left_prod  = left_shape.iter().fold(1, |prod, &e| { prod * e });
+				let right_prod = right_shape.iter().fold(1, |prod, &e| { prod * e });
+				if left_prod < right_prod {
+					let expand_left = inputs[0].broadcast(&right_shape);
+					vec![expand_left - inputs[1]]
+				}
+				else if left_prod > right_prod {
+					let expand_right = inputs[1].broadcast(&left_shape);
+					vec![inputs[0] - expand_right]
+				}
+				else {
+					vec![inputs[0] - inputs[1]]
+				}
+			},
+			|inputs, grads, _opt| {
+				let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+				let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+				let mut left_neuron  = inputs[0].borrow_mut();
+				let mut right_neuron = inputs[1].borrow_mut();
 
-											  let mut n = inputs[1].borrow_mut();
-											  if !n.is_constant() {
-												  let (sn,output) = Self::neg(Rc::clone(&grads[0]));
-												  sns.push(sn);
-												  input_grad = true;
-												  if let Some(ref g) = n.ref_grad() {
-													  outputs.push(Rc::clone(&g));
-													  let (sn, output) = Self::add(Rc::clone(&g), output);
-													  n.set_grad(Rc::clone(&output));
-													  sns.push(sn);
-													  outputs.push(output);
-												  }
-												  else {
-													  n.set_grad(output);
-												  }
-											  }
-											  if input_grad {
-												  outputs.push(Rc::clone(&grads[0]));
-											  }
-											 (sns,outputs)
-										  }));
-		let rs = Rc::new(RefCell::new(s));
-		output.borrow_mut().set_generator(Rc::clone(&rs));
-		rs.borrow().forward();
-		(rs, output)
+				let left_shape  = left_neuron.ref_signal().shape();
+				let right_shape = right_neuron.ref_signal().shape();
+
+				if left_neuron.is_constant() && right_neuron.is_constant() {
+					return (sns,outputs);
+				}
+
+				outputs.push(Rc::clone(&grads[0]));
+				if !left_neuron.is_constant() {
+					let grad = if grads[0].borrow().ref_signal().shape() != left_shape {
+						let (sn,output) = Self::sum_to(Rc::clone(&grads[0]), left_shape);
+						sns.push(sn);
+						outputs.push(Rc::clone(&output));
+						output
+					}
+					else {
+						Rc::clone(&grads[0])
+					};
+
+					if let Some(ref g) = left_neuron.ref_grad() {
+						outputs.push(Rc::clone(g));
+						let (sn, output) = Self::sub(Rc::clone(&g), grad);
+						left_neuron.set_grad(Rc::clone(&output));
+						sns.push(sn);
+						outputs.push(output)
+					}
+					else {
+						left_neuron.set_grad(grad)
+					}
+				}
+
+				if !right_neuron.is_constant() {
+
+					let (sn, neg_grad) = Self::neg(Rc::clone(&grads[0]));
+					sns.push(sn);
+
+					let grad = if neg_grad.borrow().ref_signal().shape() != right_shape {
+						let (sn, output) = Self::sum_to(Rc::clone(&neg_grad), right_shape);
+						sns.push(sn);
+						outputs.push(Rc::clone(&output));
+						output
+					}
+					else {
+						Rc::clone(&neg_grad)
+					};
+
+					if let Some(ref g) = right_neuron.ref_grad() {
+						outputs.push(Rc::clone(g));
+						let (sn, output) = Self::add(Rc::clone(&g), grad);
+						left_neuron.set_grad(Rc::clone(&output));
+						sns.push(sn);
+						outputs.push(output)
+					}
+					else {
+						right_neuron.set_grad(grad)
+					}
+				}
+
+				(sns,outputs)
+			});
+		let sn = SynapseNode::<T>::new(&label,
+									   vec![Rc::clone(&x),Rc::clone(&y)],
+									   vec![Rc::clone(&output)],
+									   s);
+		let rsn = Rc::new(RefCell::new(sn));
+		output.borrow_mut().set_generator(Rc::clone(&rsn));
+		rsn.borrow().forward();
+		(rsn, output)
 	}
 
 	pub fn exp(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
@@ -496,92 +524,6 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 											  }
 											  (sns,outputs)
 										  }));
-		let rs = Rc::new(RefCell::new(s));
-		output.borrow_mut().set_generator(Rc::clone(&rs));
-		rs.borrow().forward();
-		(rs, output)
-	}
-
-	pub fn hadamard_product(x:NNNeuron<T>,y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>){
-		assert_eq!(x.borrow().shape(),y.borrow().shape());
-		let label = "hadamard";
-		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
-		let s = SynapseNode::<T>::new(&label,
-									  vec![Rc::clone(&x), Rc::clone(&y)],
-									  vec![Rc::clone(&output)],
-									  Synapse::<T>::new(
-										  |inputs,_opt| {
-											  vec![Tensor::<T>::hadamard_product(inputs[0], inputs[1])]
-										  },
-										  |inputs,grads,_opt| {
-											  let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
-											  let mut outputs:Vec<NNNeuron<T>> = Vec::new();
-
-											  if inputs[0].borrow().is_constant() &&
-												 inputs[1].borrow().is_constant() {
-												  (sns,outputs)
-											  }
-											  else {
-												  if !inputs[0].borrow().is_constant() {
-													  let output = if grads[0].borrow().is_constant() && inputs[1].borrow().is_constant() {
-														  let t = Tensor::<T>::hadamard_product(grads[0].borrow().ref_signal(),inputs[1].borrow().ref_signal());
-														  let label = "(".to_string() + grads[0].borrow().name() + ") * (" + inputs[1].borrow().name() + ")";
-														  nn_neuron_constant(&label, t)
-													  }
-													  else {
-														  let (l_sn, l_output) = Self::hadamard_product(Rc::clone(&grads[0]), Rc::clone(&inputs[1]));
-														  sns.push(l_sn);
-														  outputs.push(Rc::clone(&inputs[1]));
-														  outputs.push(Rc::clone(&grads[0]));
-														  l_output
-													  };
-													  outputs.push(Rc::clone(&output));
-													  {
-														  let mut n = inputs[0].borrow_mut();
-														  if let Some(ref g) = n.ref_grad() {
-															  outputs.push(Rc::clone(&g));
-															  let (sn, output) = Self::add(Rc::clone(&g), output);
-															  n.set_grad(Rc::clone(&output));
-															  sns.push(sn);
-															  outputs.push(output);
-														  }
-														  else {
-															  n.set_grad(output);
-														  }
-													  }
-												  }
-												  if !inputs[1].borrow().is_constant() {
-													  let output = if grads[0].borrow().is_constant() && inputs[0].borrow().is_constant() {
-														  let t = Tensor::<T>::hadamard_product(grads[0].borrow().ref_signal(),inputs[0].borrow().ref_signal());
-														  let label = "(".to_string() + grads[0].borrow().name() + ") * (" + inputs[0].borrow().name() + ")";
-														  nn_neuron_constant(&label, t)
-													  }
-													  else {
-														  let (l_sn, l_output) = Self::hadamard_product(Rc::clone(&grads[0]), Rc::clone(&inputs[0]));
-														  sns.push(l_sn);
-														  outputs.push(Rc::clone(&inputs[0]));
-														  outputs.push(Rc::clone(&grads[0]));
-														  l_output
-													  };
-													  outputs.push(Rc::clone(&output));
-													  {
-														  let mut n = inputs[1].borrow_mut();
-														  if let Some(ref g) = n.ref_grad() {
-															  outputs.push(Rc::clone(&g));
-															  let (sn, output) = Self::add(Rc::clone(&g), output);
-															  n.set_grad(Rc::clone(&output));
-															  sns.push(sn);
-															  outputs.push(output);
-														  }
-														  else {
-															  n.set_grad(output);
-														  }
-													  }
-												  }
-												  (sns,outputs)
-											  }
-										  }
-									  ));
 		let rs = Rc::new(RefCell::new(s));
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
