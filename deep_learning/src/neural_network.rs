@@ -240,6 +240,13 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		output
 	}
 
+	pub fn pow(&mut self, a:NNNeuron<T>, x:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::pow(a,x);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn hadamard_product(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::hadamard_product(x,y);
 		self.cg_order[0].append_nodes(vec![sn]);
@@ -249,6 +256,13 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 
 	pub fn hadamard_division(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::hadamard_division(x,y);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
+	pub fn matrix_product(&mut self, x:NNNeuron<T>, y:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::matrix_product(x,y);
 		self.cg_order[0].append_nodes(vec![sn]);
 		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
 		output

@@ -1,7 +1,7 @@
 
 use num;
 
-use crate::tensor::tensor_base::{Tensor};
+use crate::tensor::tensor_base::Tensor;
 //use crate::tensor::tensor_add::*;
 
 impl<T> Tensor<T>
