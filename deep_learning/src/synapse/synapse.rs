@@ -4,7 +4,7 @@ use std::cell::{Ref,RefCell};
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
 
-use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
+use crate::neuron::{NeuronPrimType,NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
 pub enum SynapseOption {
 	BroadcastTo((Vec<usize>,Vec<usize>)),
@@ -20,14 +20,14 @@ pub type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>,
 							   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>);
 
 pub struct Synapse<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	forward: ForwardProp<T>,
 	make_diff_node: MakeDiffNode<T>,
 	synapse_opt: Option<SynapseOption>
 }
 
 impl<T> Synapse<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	pub fn new(forward: ForwardProp<T>,
 			   make_diff_node: MakeDiffNode<T> ) -> Synapse<T> {
 		Synapse {
@@ -51,7 +51,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 }
 
 pub struct SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	name: String,
 	inputs: Vec<NNNeuron<T>>,
 	outputs: Vec<NNNeuron<T>>,
@@ -62,7 +62,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 pub type NNSynapseNode<T> = Rc<RefCell<SynapseNode<T>>>;
 
 impl<T> fmt::Display for SynapseNode<T>
-where T: fmt::Display + Clone + num::Float + num::pow::Pow<T, Output = T> {
+where T: NeuronPrimType<T> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut disp = format!("SynapseNode. name:{}\n",self.name);
 		disp = format!("{}generation:{}", disp, self.generation);
@@ -71,7 +71,7 @@ where T: fmt::Display + Clone + num::Float + num::pow::Pow<T, Output = T> {
 }
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 
 	pub fn new(name:&str,
 			   inputs: Vec<NNNeuron<T>>,

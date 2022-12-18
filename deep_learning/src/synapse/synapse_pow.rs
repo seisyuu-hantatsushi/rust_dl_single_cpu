@@ -8,7 +8,7 @@ use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
 use crate::neuron::{NNNeuron, nn_neuron_new, nn_neuron_constant};
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 
 	fn pow_rank0_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
 						 -> Vec<Tensor<T>> {

@@ -7,7 +7,7 @@ use crate::synapse::{Synapse,SynapseNode,NNSynapseNode};
 use crate::neuron::{NNNeuron,nn_neuron_new};
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 	pub fn sin(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "sin";
 		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));

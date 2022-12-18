@@ -5,10 +5,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
 use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
-use crate::neuron::{NNNeuron,nn_neuron_new,nn_neuron_constant};
+use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 
 	fn matrix_product_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
 							  -> Vec<Tensor<T>> {

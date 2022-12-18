@@ -7,8 +7,14 @@ use linear_transform::tensor::Tensor;
 
 use crate::synapse::NNSynapseNode;
 
+use trait_set::trait_set;
+
+trait_set! {
+	pub trait NeuronPrimType<T> = num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display;
+}
+
 pub struct Neuron<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T: NeuronPrimType<T> {
 	name: String,
 	constant: bool,
 	signal: Tensor<T>,
@@ -17,7 +23,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 }
 
 impl<T> fmt::Display for Neuron<T>
-where T: fmt::Display + Clone + num::Float + num::pow::Pow<T, Output = T> {
+where T: NeuronPrimType<T> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut disp = format!("Neuron. name:{}\n",self.name);
 		disp = format!("{}Singal:{}", disp, self.signal);
@@ -26,7 +32,8 @@ where T: fmt::Display + Clone + num::Float + num::pow::Pow<T, Output = T> {
 }
 
 impl<T> Neuron<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
+
 	pub fn new(name:&str, init_signal:Tensor<T>) -> Neuron<T> {
 		Neuron {
 			name: name.to_string(),
@@ -109,11 +116,11 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 pub type NNNeuron<T> = Rc<RefCell<Neuron<T>>>;
 
 pub fn nn_neuron_new<T>(name:&str, init_signal:Tensor<T>) -> NNNeuron<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	Rc::new(RefCell::new(Neuron::<T>::new(name,init_signal)))
 }
 
 pub fn nn_neuron_constant<T>(name:&str, init_signal:Tensor<T>) -> NNNeuron<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	Rc::new(RefCell::new(Neuron::<T>::constant(name,init_signal)))
 }
