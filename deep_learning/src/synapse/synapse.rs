@@ -326,15 +326,16 @@ where T:NeuronPrimType<T> {
 					sns.push(sn);
 
 					let grad = if neg_grad.borrow().ref_signal().shape() != right_shape {
-						let (sn, output) = Self::sum_to(Rc::clone(&neg_grad), right_shape);
+						outputs.push(Rc::clone(&neg_grad));
+						let (sn, output) = Self::sum_to(neg_grad, right_shape);
 						sns.push(sn);
 						outputs.push(Rc::clone(&output));
 						output
 					}
 					else {
-						Rc::clone(&neg_grad)
+						neg_grad
 					};
-
+					outputs.push(Rc::clone(&grad));
 					if let Some(ref g) = right_neuron.ref_grad() {
 						outputs.push(Rc::clone(g));
 						let (sn, output) = Self::add(Rc::clone(&g), grad);

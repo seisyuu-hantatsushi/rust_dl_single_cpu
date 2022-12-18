@@ -10,14 +10,14 @@ use crate::neuron::{NeuronPrimType,NNNeuron,Neuron,nn_neuron_new,nn_neuron_const
 use crate::synapse::{NNSynapseNode,SynapseNode};
 
 struct ComputationalGraph<T>
-where T: NeuronPrimType<T>{
+where T: NeuronPrimType<T> {
 	neurons: HashMap<* const RefCell<Neuron<T>>, NNNeuron<T>>,
 	synapse_nodes: HashMap<* const RefCell<SynapseNode<T>>, Rc<RefCell<SynapseNode<T>>>>,
 	generation_table: Vec<Vec<NNSynapseNode<T>>>
 }
 
 impl<T> ComputationalGraph<T>
-where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 
 	fn new() -> ComputationalGraph<T> {
 		ComputationalGraph {
@@ -153,12 +153,12 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 }
 
 pub struct NeuralNetwork<T>
-where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T: NeuronPrimType<T>{
 	cg_order: Vec<ComputationalGraph<T>>
 }
 
 impl<T> NeuralNetwork<T>
-where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 	pub fn new() -> NeuralNetwork<T> {
 		NeuralNetwork {
 			cg_order: vec![ComputationalGraph::<T>::new()]

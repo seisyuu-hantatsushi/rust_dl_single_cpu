@@ -22,11 +22,60 @@ where T:NeuronPrimType<T> {
 	}
 
 	fn mse_backward(inputs: &Vec<NNNeuron<T>>,
-				   grads: &Vec<NNNeuron<T>>,
-				   _opt: &Option<SynapseOption>)
-				   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
+					grads: &Vec<NNNeuron<T>>,
+					_opt: &Option<SynapseOption>)
+					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+
+		if inputs[0].borrow().is_constant() && inputs[1].borrow().is_constant() {
+			return (sns,outputs);
+		}
+		outputs.push(Rc::clone(&grads[0]));
+		let (sn, diff) = Self::sub(Rc::clone(&inputs[0]), Rc::clone(&inputs[1]));
+		sns.push(sn);
+		outputs.push(Rc::clone(&diff));
+		let (sn, output) = Self::broadcast_to(Rc::clone(&grads[0]), diff.borrow().shape());
+		sns.push(sn);
+		outputs.push(Rc::clone(&output));
+		let diff_len:T = num::FromPrimitive::from_usize(diff.borrow().ref_signal().num_of_elements()).unwrap_or_else(|| panic!("invalid shape"));
+		let two:T = num::one::<T>()+num::one::<T>();
+		let (sn, gy) = Self::hadamard_product(output, diff);
+ 		sns.push(sn);
+		outputs.push(Rc::clone(&gy));
+		let scale = nn_neuron_constant("mes_backward_scale", Tensor::<T>::from_array(&[1,1],&[two/diff_len;1]));
+		outputs.push(Rc::clone(&scale));
+		let (sn, gy) = Self::hadamard_product(gy,scale);
+		sns.push(sn);
+		outputs.push(Rc::clone(&gy));
+		if !inputs[0].borrow().is_constant() {
+			let mut n = inputs[0].borrow_mut();
+			if let Some(ref g) = n.ref_grad(){
+				let (sn, output) = Self::sub(Rc::clone(&g), Rc::clone(&gy));
+				sns.push(sn);
+				outputs.push(output);
+				n.set_grad(Rc::clone(&gy));
+			}
+			else {
+				n.set_grad(Rc::clone(&gy));
+			}
+		}
+
+		if !inputs[1].borrow().is_constant() {
+			let (sn, neg_grad) = Self::neg(gy);
+			sns.push(sn);
+			outputs.push(Rc::clone(&neg_grad));
+			let mut n = inputs[1].borrow_mut();
+			if let Some(ref g) = n.ref_grad(){
+				let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&neg_grad));
+				sns.push(sn);
+				outputs.push(Rc::clone(&output));
+				n.set_grad(output);
+			}
+			else {
+				n.set_grad(neg_grad);
+			}
+		}
 		(sns,outputs)
 	}
 
