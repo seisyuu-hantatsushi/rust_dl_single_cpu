@@ -7,175 +7,175 @@ impl<T> Tensor<T>
 where T:num::Num+Clone+Copy {
 
     pub fn reshape(&self, shape:&[usize]) -> Tensor<T> {
-	assert_eq!(self.buffer().len(), shape.iter().fold(1,|prod,d| { prod * (*d) }));
-	Tensor::from_vector(shape.to_vec(), self.buffer().to_vec())
+		assert_eq!(self.buffer().len(), shape.iter().fold(1,|prod,d| { prod * (*d) }));
+		Tensor::from_vector(shape.to_vec(), self.buffer().to_vec())
     }
 
     fn sum_subtensor(v:&[T],
-		     src_shape:&[usize],
-		     dst_shape:&[usize]) -> Tensor<T> {
-	let t = if dst_shape.len() > 2 {
-	    let t = if dst_shape[0] == 1 {
-		let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
-		let strided_vec = v.chunks(stride);
-		let init_accum:Vec<T> = vec![num::zero();stride];
-		let sum_tensor_v = strided_vec.fold(init_accum,
-						    |accum, e| {
-							accum.iter().zip(e.iter()).map(|(&a,&v)| a+v).collect::<Vec<T>>()
-						    });
+					 src_shape:&[usize],
+					 dst_shape:&[usize]) -> Tensor<T> {
+		let t = if dst_shape.len() > 2 {
+			let t = if dst_shape[0] == 1 {
+				let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
+				let strided_vec = v.chunks(stride);
+				let init_accum:Vec<T> = vec![num::zero();stride];
+				let sum_tensor_v = strided_vec.fold(init_accum,
+													|accum, e| {
+														accum.iter().zip(e.iter()).map(|(&a,&v)| a+v).collect::<Vec<T>>()
+													});
 		Self::sum_subtensor(&sum_tensor_v, &src_shape[1..], &dst_shape[1..])
-	    }
-	    else {
-		let mut ts:Vec<Tensor<T>> = vec!();
-		let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
-		let strided_vec = v.chunks(stride);
-		for sv in strided_vec {
-		    let t = Self::sum_subtensor(sv, &src_shape[1..], &dst_shape[1..]);
-		    ts.push(t);
-		}
-		let mut v:Vec<T> = vec!();
-		for t in ts.iter() {
-		    v.extend(t.buffer());
-		}
-
-		fn new_reshaper(shape:&[usize]) -> Vec<usize> {
-		    if shape.len() > 2 {
-			let mut v:Vec<usize> = vec!();
-			if shape[0] != 1 {
-			    v.push(shape[0]);
-			}
-			v.extend(&new_reshaper(&shape[1..]));
-			v
-		    }
-		    else {
-			if shape[0] == 1 && shape[1] == 1 {
-			    vec![1]
-			}
-			else if shape[0] != 1 && shape[1] != 1 {
-			    shape.to_vec()
 			}
 			else {
-			    vec![shape[0]*shape[1]]
+				let mut ts:Vec<Tensor<T>> = vec!();
+				let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
+				let strided_vec = v.chunks(stride);
+				for sv in strided_vec {
+					let t = Self::sum_subtensor(sv, &src_shape[1..], &dst_shape[1..]);
+					ts.push(t);
+				}
+				let mut v:Vec<T> = vec!();
+				for t in ts.iter() {
+					v.extend(t.buffer());
+				}
+				
+				fn new_reshaper(shape:&[usize]) -> Vec<usize> {
+					if shape.len() > 2 {
+						let mut v:Vec<usize> = vec!();
+						if shape[0] != 1 {
+							v.push(shape[0]);
+						}
+						v.extend(&new_reshaper(&shape[1..]));
+						v
+					}
+					else {
+						if shape[0] == 1 && shape[1] == 1 {
+							vec![1]
+						}
+						else if shape[0] != 1 && shape[1] != 1 {
+							shape.to_vec()
+						}
+						else {
+							vec![shape[0]*shape[1]]
 			}
-		    }
+					}
+				}
+				let new_shape = new_reshaper(&dst_shape);
+				Tensor::from_vector(new_shape, v)
+			};
+			t
 		}
-		let new_shape = new_reshaper(&dst_shape);
-		Tensor::from_vector(new_shape, v)
-	    };
-	    t
-	}
-	else {
-	    if dst_shape[0] == 1 && dst_shape[1] == 1 {
-		let s = v.into_iter().fold(num::zero(),|accum, e| accum+*e);
-		Tensor::<T>::from_array(&[1,1], &[s])
-	    }
+		else {
+			if dst_shape[0] == 1 && dst_shape[1] == 1 {
+				let s = v.into_iter().fold(num::zero(),|accum, e| accum+*e);
+				Tensor::<T>::from_array(&[1,1], &[s])
+			}
 	    else if dst_shape[0] == 1 {
-		let strided_vec = v.chunks(dst_shape[1]);
-		let mut accum:Vec<T> = vec![num::zero();dst_shape[1]];
-		for v in strided_vec {
-		    accum = accum.iter().zip(v.iter()).map(|(&a,&v)| a+v).collect::<Vec<T>>();
-		}
-		Tensor::from_vector(vec![1,dst_shape[1]],accum)
+			let strided_vec = v.chunks(dst_shape[1]);
+			let mut accum:Vec<T> = vec![num::zero();dst_shape[1]];
+			for v in strided_vec {
+				accum = accum.iter().zip(v.iter()).map(|(&a,&v)| a+v).collect::<Vec<T>>();
+			}
+			Tensor::from_vector(vec![1,dst_shape[1]],accum)
 	    }
-	    else if dst_shape[1] == 1 {
-		let strided_vec = v.chunks(src_shape[1]);
-		let mut sum_v:Vec<T> = vec!();
-		for v in strided_vec {
-		    let s = v.iter().fold(num::zero(),|accum,&e| accum + e);
-		    sum_v.push(s);
-		}
-		Tensor::from_vector(vec![dst_shape[0],1],sum_v)
-	    }
-	    else {
-		Tensor::<T>::from_array(dst_shape, v)
-	    }
-	};
-	return t;
+			else if dst_shape[1] == 1 {
+				let strided_vec = v.chunks(src_shape[1]);
+				let mut sum_v:Vec<T> = vec!();
+				for v in strided_vec {
+					let s = v.iter().fold(num::zero(),|accum,&e| accum + e);
+					sum_v.push(s);
+				}
+				Tensor::from_vector(vec![dst_shape[0],1],sum_v)
+			}
+			else {
+				Tensor::<T>::from_array(dst_shape, v)
+			}
+		};
+		return t;
     }
 
     pub fn sum(&self, shape:&[usize]) -> Tensor<T> {
-	// まずは,形のチェック
-	assert_eq!(shape.len(),self.shape().len());
-	for (o,s) in self.shape().iter().zip(shape.iter()) {
-	    if !(o == s || *s == 1) {
-		panic!("invalid shape");
-	    }
-	}
-	Self::sum_subtensor(self.buffer(), self.shape(), shape)
+		// まずは,形のチェック
+		assert_eq!(shape.len(),self.shape().len());
+		for (o,s) in self.shape().iter().zip(shape.iter()) {
+			if !(o == s || *s == 1) {
+				panic!("invalid shape");
+			}
+		}
+		Self::sum_subtensor(self.buffer(), self.shape(), shape)
     }
 
     fn broadcast_subtensor(v:&[T],
 			   src_shape:&[usize],
 			   dst_shape:&[usize]) -> Vec<T> {
-	//println!("broadcast subtensor {:?} {:?}",src_shape,dst_shape);
-	let v = if src_shape.len() > 1 {
-	    let mut broadcasted_v:Vec<T> = Vec::new();
-	    if src_shape[0] == 1 {
-		for s in 0..dst_shape[0] {
-		    broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
+		//println!("broadcast subtensor {:?} {:?}",src_shape,dst_shape);
+		let v = if src_shape.len() > 1 {
+			let mut broadcasted_v:Vec<T> = Vec::new();
+			if src_shape[0] == 1 {
+				for _ in 0..dst_shape[0] {
+					broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
+				}
+			}
+			else {
+				let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
+				for v in v.chunks(stride) {
+					broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
+				}
+			}
+			broadcasted_v
 		}
-	    }
-	    else {
-		let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
-		for v in v.chunks(stride) {
-		    broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
-		}
-	    }
-	    broadcasted_v
-	}
-	else {
-	    assert!(dst_shape[0] % src_shape[0] == 0);
-	    if dst_shape[0] != src_shape[0] {
-		let mut broadcasted_v:Vec<T> = Vec::new();
-		for _ in 0..dst_shape[0] {
-		    broadcasted_v.extend(v);
-		}
-		broadcasted_v
-	    }
-	    else {
-		v.to_vec()
-	    }
-	};
-	v
+		else {
+			assert!(dst_shape[0] % src_shape[0] == 0);
+			if dst_shape[0] != src_shape[0] {
+				let mut broadcasted_v:Vec<T> = Vec::new();
+				for _ in 0..dst_shape[0] {
+					broadcasted_v.extend(v);
+				}
+				broadcasted_v
+			}
+			else {
+				v.to_vec()
+			}
+		};
+		v
     }
 
     pub fn broadcast(&self, shape:&[usize]) -> Tensor<T> {
-	assert!(self.shape().len() <= shape.len());
-	let (src_shape, dst_shape):(Vec<usize>,Vec<usize>) = if self.shape().len() == shape.len() {
-	    (self.shape().to_vec(), shape.to_vec())
-	}
-	else {
-	    let mut src_shape:Vec<usize> = vec![1;shape.len()-self.shape().len()];
-	    src_shape.extend(&self.shape().to_vec());
-	    (src_shape,shape.to_vec())
-	};
-	let v = Self::broadcast_subtensor(self.buffer(), &src_shape, &dst_shape);
-	Tensor::from_vector(dst_shape.to_vec(), v)
+		assert!(self.shape().len() <= shape.len());
+		let (src_shape, dst_shape):(Vec<usize>,Vec<usize>) = if self.shape().len() == shape.len() {
+			(self.shape().to_vec(), shape.to_vec())
+		}
+		else {
+			let mut src_shape:Vec<usize> = vec![1;shape.len()-self.shape().len()];
+			src_shape.extend(&self.shape().to_vec());
+			(src_shape,shape.to_vec())
+		};
+		let v = Self::broadcast_subtensor(self.buffer(), &src_shape, &dst_shape);
+		Tensor::from_vector(dst_shape.to_vec(), v)
     }
 }
 
 #[test]
 fn tensor_reshape_test () {
     {
-	let shape:[usize;2] = [3,4];
-	let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
-				21.0,22.0,23.0,24.0,
-				31.0,32.0,33.0,34.0 ];
-	let t0 = Tensor::<f32>::from_array(&shape, &m_init);
-	let t1 = t0.reshape(&[4,3]);
-	println!("reshape {}", t1);
-
-	let t1 = t0.sum(&[1,1]);
-	println!("sum [1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
-	assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
-
-	let t1 = t0.sum(&[1,4]);
-	println!("sum [1,4] {}", t1);
-	assert_eq!(t1, Tensor::<f32>::from_array(&[1,4],&[63.0,66.0,69.0,72.0]));
-
-	let t1 = t0.sum(&[3,1]);
-	println!("sum [3,1] {}", t1);
-	assert_eq!(t1, Tensor::<f32>::from_array(&[3,1],&[50.0,90.0,130.0]));
+		let shape:[usize;2] = [3,4];
+		let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
+								21.0,22.0,23.0,24.0,
+								31.0,32.0,33.0,34.0 ];
+		let t0 = Tensor::<f32>::from_array(&shape, &m_init);
+		let t1 = t0.reshape(&[4,3]);
+		println!("reshape {}", t1);
+		
+		let t1 = t0.sum(&[1,1]);
+		println!("sum [1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
+		
+		let t1 = t0.sum(&[1,4]);
+		println!("sum [1,4] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,4],&[63.0,66.0,69.0,72.0]));
+		
+		let t1 = t0.sum(&[3,1]);
+		println!("sum [3,1] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[3,1],&[50.0,90.0,130.0]));
     }
     {
 	let m_init:[f32;36] = [ 111.0,112.0,113.0,114.0,

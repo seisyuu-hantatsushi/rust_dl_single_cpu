@@ -1,5 +1,4 @@
 use std::{ops,fmt};
-use std::sync::Mutex;
 use num;
 
 /*
@@ -63,6 +62,10 @@ where T: fmt::Display + Clone {
 impl<T:Clone> Tensor<T> {
     pub fn shape(&self) -> &[usize] {
 	self.shape.as_slice()
+    }
+
+    pub fn num_of_elements(&self) -> usize {
+	self.shape.iter().fold(1,|prod, &n| prod*n)
     }
 }
 
