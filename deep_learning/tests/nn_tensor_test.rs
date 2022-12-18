@@ -314,13 +314,13 @@ fn matmul_test() -> Result<(),Box<dyn std::error::Error>> {
 		let y = nn.create_neuron("y", Tensor::<f64>::from_array(&[3,2],&[1.0,2.0,3.0,4.0,5.0,6.0]));
 		let z = nn.matrix_product(Rc::clone(&x), Rc::clone(&y));
 
-		println!("z {}", z.borrow());
+		//println!("z {}", z.borrow());
 		assert_eq!(z.borrow().ref_signal(), &Tensor::<f64>::from_array(&[2,2], &[22.0,28.0,49.0,64.0]));
 		nn.backward_propagating(0)?;
 
 		let borrowed_x = x.borrow();
 		if let Some(ref gx) = borrowed_x.ref_grad() {
-			println!("gx {}",gx.borrow().ref_signal());
+			//println!("gx {}",gx.borrow().ref_signal());
 			assert_eq!(gx.borrow().ref_signal(), &Tensor::<f64>::from_array(&[2,3], &[3.0,7.0,11.0,3.0,7.0,11.0]));
 		}
 		else {
@@ -329,9 +329,8 @@ fn matmul_test() -> Result<(),Box<dyn std::error::Error>> {
 
 		let borrowed_y = y.borrow();
 		if let Some(ref gy) = borrowed_y.ref_grad() {
-			println!("gy {}",gy.borrow().ref_signal());
+			//println!("gy {}",gy.borrow().ref_signal());
 			assert_eq!(gy.borrow().ref_signal(), &Tensor::<f64>::from_array(&[3,2], &[5.0,5.0,7.0,7.0,9.0,9.0]));
-
 		}
 		else {
 			assert!(false);
@@ -367,7 +366,5 @@ fn matmul_test() -> Result<(),Box<dyn std::error::Error>> {
 		}
 	}
 
-	
-	
 	Ok(())
 }

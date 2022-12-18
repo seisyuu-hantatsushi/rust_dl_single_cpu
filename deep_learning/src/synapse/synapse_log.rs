@@ -71,7 +71,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 				   grads: &Vec<NNNeuron<T>>,
 				   _opt: &Option<SynapseOption>)
 				   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
-				let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 		// (ln x)' = 1/x
 		let one = nn_neuron_constant("1.0", Tensor::<T>::one(&[1,1]));

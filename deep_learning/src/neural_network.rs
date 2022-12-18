@@ -289,6 +289,13 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 		output
 	}
 
+	pub fn mean_square_error(&mut self, x0:NNNeuron<T>, x1:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::mean_square_error(x0, x1);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn forward_propagating(&mut self, order:usize) -> Result<Vec<NNNeuron<T>>,String> {
 		if order < self.cg_order.len() {
 			let outputs = self.cg_order[order].forward();

@@ -7,5 +7,6 @@ pub mod synapse_div_rank0;
 pub mod synapse_pow;
 pub mod synapse_log;
 pub mod synapse_trigonometric;
+pub mod synapse_error_funcs;
 
 pub use synapse::{Synapse, SynapseOption, SynapseNode, NNSynapseNode};
