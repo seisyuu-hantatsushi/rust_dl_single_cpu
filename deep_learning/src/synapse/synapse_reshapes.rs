@@ -1,13 +1,12 @@
 /* -*- tab-width:4 -*- */
-use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
 use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
-use crate::neuron::{NNNeuron,nn_neuron_new};
+use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new};
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 
 	pub fn reshape(x:NNNeuron<T>, dst_shape:Vec<usize>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let num_of_elements = x.borrow().ref_signal().buffer().len();

@@ -37,7 +37,7 @@ where T:num::Num+Clone+Copy {
 			for t in ts.iter() {
 				v.extend(t.buffer());
 			}
-			
+
 			fn new_reshaper(shape:&[usize]) -> Vec<usize> {
 				if shape.len() > 2 {
 					let mut v:Vec<usize> = vec!();
@@ -94,6 +94,7 @@ where T:num::Num+Clone+Copy {
 	}
 
 	pub fn sum(&self, shape:&[usize]) -> Tensor<T> {
+
 		// まずは,形のチェック
 		assert_eq!(shape.len(),self.shape().len());
 		for (o,s) in self.shape().iter().zip(shape.iter()) {
@@ -107,75 +108,75 @@ where T:num::Num+Clone+Copy {
     fn broadcast_subtensor(v:&[T],
 			   src_shape:&[usize],
 			   dst_shape:&[usize]) -> Vec<T> {
-	//println!("broadcast subtensor {:?} {:?}",src_shape,dst_shape);
-	let v = if src_shape.len() > 1 {
-	    let mut broadcasted_v:Vec<T> = Vec::new();
-	    if src_shape[0] == 1 {
-		for s in 0..dst_shape[0] {
-		    broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
+		//println!("broadcast subtensor {:?} {:?}",src_shape,dst_shape);
+		let v = if src_shape.len() > 1 {
+			let mut broadcasted_v:Vec<T> = Vec::new();
+			if src_shape[0] == 1 {
+				for _ in 0..dst_shape[0] {
+					broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
+				}
+			}
+			else {
+				let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
+				for v in v.chunks(stride) {
+					broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
+				}
+			}
+			broadcasted_v
 		}
-	    }
-	    else {
-		let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
-		for v in v.chunks(stride) {
-		    broadcasted_v.extend(Self::broadcast_subtensor(v, &src_shape[1..], &dst_shape[1..]));
-		}
-	    }
-	    broadcasted_v
-	}
-	else {
-	    assert!(dst_shape[0] % src_shape[0] == 0);
-	    if dst_shape[0] != src_shape[0] {
-		let mut broadcasted_v:Vec<T> = Vec::new();
-		for _ in 0..dst_shape[0] {
-		    broadcasted_v.extend(v);
-		}
-		broadcasted_v
-	    }
-	    else {
-		v.to_vec()
-	    }
-	};
-	v
+		else {
+			assert!(dst_shape[0] % src_shape[0] == 0);
+			if dst_shape[0] != src_shape[0] {
+				let mut broadcasted_v:Vec<T> = Vec::new();
+				for _ in 0..dst_shape[0] {
+					broadcasted_v.extend(v);
+				}
+				broadcasted_v
+			}
+			else {
+				v.to_vec()
+			}
+		};
+		v
     }
 
     pub fn broadcast(&self, shape:&[usize]) -> Tensor<T> {
-	assert!(self.shape().len() <= shape.len());
-	let (src_shape, dst_shape):(Vec<usize>,Vec<usize>) = if self.shape().len() == shape.len() {
-	    (self.shape().to_vec(), shape.to_vec())
-	}
-	else {
-	    let mut src_shape:Vec<usize> = vec![1;shape.len()-self.shape().len()];
-	    src_shape.extend(&self.shape().to_vec());
-	    (src_shape,shape.to_vec())
-	};
-	let v = Self::broadcast_subtensor(self.buffer(), &src_shape, &dst_shape);
-	Tensor::from_vector(dst_shape.to_vec(), v)
+		assert!(self.shape().len() <= shape.len());
+		let (src_shape, dst_shape):(Vec<usize>,Vec<usize>) = if self.shape().len() == shape.len() {
+			(self.shape().to_vec(), shape.to_vec())
+		}
+		else {
+			let mut src_shape:Vec<usize> = vec![1;shape.len()-self.shape().len()];
+			src_shape.extend(&self.shape().to_vec());
+			(src_shape,shape.to_vec())
+		};
+		let v = Self::broadcast_subtensor(self.buffer(), &src_shape, &dst_shape);
+		Tensor::from_vector(dst_shape.to_vec(), v)
     }
 }
 
 #[test]
 fn tensor_reshape_test () {
     {
-	let shape:[usize;2] = [3,4];
-	let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
-				21.0,22.0,23.0,24.0,
-				31.0,32.0,33.0,34.0 ];
-	let t0 = Tensor::<f32>::from_array(&shape, &m_init);
-	let t1 = t0.reshape(&[4,3]);
-	println!("reshape {}", t1);
-
-	let t1 = t0.sum(&[1,1]);
-	println!("sum [1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
-	assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
-
-	let t1 = t0.sum(&[1,4]);
-	println!("sum [1,4] {}", t1);
-	assert_eq!(t1, Tensor::<f32>::from_array(&[1,4],&[63.0,66.0,69.0,72.0]));
-
-	let t1 = t0.sum(&[3,1]);
-	println!("sum [3,1] {}", t1);
-	assert_eq!(t1, Tensor::<f32>::from_array(&[3,1],&[50.0,90.0,130.0]));
+		let shape:[usize;2] = [3,4];
+		let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
+								21.0,22.0,23.0,24.0,
+								31.0,32.0,33.0,34.0 ];
+		let t0 = Tensor::<f32>::from_array(&shape, &m_init);
+		let t1 = t0.reshape(&[4,3]);
+		println!("reshape {}", t1);
+		
+		let t1 = t0.sum(&[1,1]);
+		println!("sum [1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
+		
+		let t1 = t0.sum(&[1,4]);
+		println!("sum [1,4] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,4],&[63.0,66.0,69.0,72.0]));
+		
+		let t1 = t0.sum(&[3,1]);
+		println!("sum [3,1] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[3,1],&[50.0,90.0,130.0]));
     }
     {
 	let m_init:[f32;36] = [ 111.0,112.0,113.0,114.0,

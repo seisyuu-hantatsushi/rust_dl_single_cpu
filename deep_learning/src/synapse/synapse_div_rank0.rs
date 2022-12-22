@@ -5,10 +5,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
 use crate::synapse::{Synapse,SynapseNode,NNSynapseNode};
-use crate::neuron::{NNNeuron,nn_neuron_new,nn_neuron_constant};
+use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 	pub fn div_rank0(x:NNNeuron<T>, y:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		assert_eq!(x.borrow().shape(),&[1,1]);
 		assert_eq!(y.borrow().shape(),&[1,1]);

@@ -4,7 +4,7 @@ use std::cell::{Ref,RefCell};
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;
 
-use crate::neuron::{NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
+use crate::neuron::{NeuronPrimType,NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
 pub enum SynapseOption {
 	BroadcastTo((Vec<usize>,Vec<usize>)),
@@ -20,14 +20,14 @@ pub type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>,
 							   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>);
 
 pub struct Synapse<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	forward: ForwardProp<T>,
 	make_diff_node: MakeDiffNode<T>,
 	synapse_opt: Option<SynapseOption>
 }
 
 impl<T> Synapse<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	pub fn new(forward: ForwardProp<T>,
 			   make_diff_node: MakeDiffNode<T> ) -> Synapse<T> {
 		Synapse {
@@ -51,7 +51,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 }
 
 pub struct SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
+where T:NeuronPrimType<T> {
 	name: String,
 	inputs: Vec<NNNeuron<T>>,
 	outputs: Vec<NNNeuron<T>>,
@@ -62,7 +62,7 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone {
 pub type NNSynapseNode<T> = Rc<RefCell<SynapseNode<T>>>;
 
 impl<T> fmt::Display for SynapseNode<T>
-where T: fmt::Display + Clone + num::Float + num::pow::Pow<T, Output = T> {
+where T: NeuronPrimType<T> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut disp = format!("SynapseNode. name:{}\n",self.name);
 		disp = format!("{}generation:{}", disp, self.generation);
@@ -71,7 +71,7 @@ where T: fmt::Display + Clone + num::Float + num::pow::Pow<T, Output = T> {
 }
 
 impl<T> SynapseNode<T>
-where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
+where T:NeuronPrimType<T> {
 
 	pub fn new(name:&str,
 			   inputs: Vec<NNNeuron<T>>,
@@ -326,15 +326,16 @@ where T:num::Float + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 					sns.push(sn);
 
 					let grad = if neg_grad.borrow().ref_signal().shape() != right_shape {
-						let (sn, output) = Self::sum_to(Rc::clone(&neg_grad), right_shape);
+						outputs.push(Rc::clone(&neg_grad));
+						let (sn, output) = Self::sum_to(neg_grad, right_shape);
 						sns.push(sn);
 						outputs.push(Rc::clone(&output));
 						output
 					}
 					else {
-						Rc::clone(&neg_grad)
+						neg_grad
 					};
-
+					outputs.push(Rc::clone(&grad));
 					if let Some(ref g) = right_neuron.ref_grad() {
 						outputs.push(Rc::clone(g));
 						let (sn, output) = Self::add(Rc::clone(&g), grad);
