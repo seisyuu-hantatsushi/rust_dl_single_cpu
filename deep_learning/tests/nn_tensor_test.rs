@@ -368,3 +368,29 @@ fn matmul_test() -> Result<(),Box<dyn std::error::Error>> {
 
 	Ok(())
 }
+
+#[test]
+fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
+	{
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[2,3],&[1.0,2.0,3.0,4.0,5.0,6.0]));
+		let y = nn.sigmod(Rc::clone(&x));
+
+		println!("y {}", y.borrow());
+
+		nn.backward_propagating(0)?;
+
+		let borrowed_x = x.borrow();
+		if let Some(ref gx) = borrowed_x.ref_grad() {
+			println!("gx {}",gx.borrow().ref_signal());
+			let x_t = Tensor::<f64>::from_array(&[2,3],&[1.0,2.0,3.0,4.0,5.0,6.0]);
+			let one = Tensor::<f64>::one(&[2,3]);
+			let gx_t = Tensor::<f64>::hadamard_product(&x_t, &(&one - &x_t));
+			assert_eq!(gx.borrow().ref_signal(), &gx_t)
+		}
+		else {
+			assert!(false);
+		}
+	}
+	Ok(())
+}
