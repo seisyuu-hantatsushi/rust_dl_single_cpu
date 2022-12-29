@@ -268,6 +268,13 @@ where T:NeuronPrimType<T> {
 		output
 	}
 
+	pub fn affine(&mut self, x:NNNeuron<T>, w:NNNeuron<T>, b:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::affine(x,w,b);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn sin(&mut self, x:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::sin(x);
 		self.cg_order[0].append_nodes(vec![sn]);
@@ -296,7 +303,6 @@ where T:NeuronPrimType<T> {
 		output
 	}
 
-	
 	pub fn mean_square_error(&mut self, x0:NNNeuron<T>, x1:NNNeuron<T>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::mean_square_error(x0, x1);
 		self.cg_order[0].append_nodes(vec![sn]);

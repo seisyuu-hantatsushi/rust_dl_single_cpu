@@ -1,6 +1,5 @@
 /* -*- tab-width:4 -*- */
 
-use std::fmt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use linear_transform::tensor::Tensor;

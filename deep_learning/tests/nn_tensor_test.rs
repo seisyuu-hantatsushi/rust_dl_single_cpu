@@ -394,3 +394,50 @@ fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
 	}
 	Ok(())
 }
+
+#[test]
+fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
+	{
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[10,1],&[2.0f64;10]));
+		let w = nn.create_neuron("w", Tensor::<f64>::from_array(&[1,10],&[3.0f64;10]));
+		let b = nn.create_neuron("b", Tensor::<f64>::from_array(&[ 1,1],&[2.0f64;1]));
+
+		let y = nn.affine(Rc::clone(&x),Rc::clone(&w),Rc::clone(&b));
+
+		println!("y {}", y.borrow());
+
+		assert_eq!(y.borrow().ref_signal(),
+				   &Tensor::<f64>::from_array(&[10,10],&[8.0f64;100]));
+
+		nn.backward_propagating(0)?;
+
+		let borrowed_x = x.borrow();
+		if let Some(ref gx) = borrowed_x.ref_grad() {
+			println!("gx {}",gx.borrow().ref_signal());
+		}
+		else {
+			assert!(false);
+		}
+
+		let borrowed_w = w.borrow();
+		if let Some(ref gw) = borrowed_w.ref_grad() {
+			println!("gw {}",gw.borrow().ref_signal());
+			
+		}
+		else {
+			assert!(false);
+		}
+
+		let borrowed_b = b.borrow();
+		if let Some(ref gb) = borrowed_b.ref_grad() {
+			println!("gb {}",gb.borrow().ref_signal());
+			let gb_t = Tensor::<f64>::from_array(&[1,1], &[100.0]);
+			assert_eq!(gb.borrow().ref_signal(), &gb_t)
+		}
+		else {
+			assert!(false);
+		}
+	}
+	Ok(())
+}
