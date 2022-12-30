@@ -8,15 +8,13 @@ use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 impl<T> SynapseNode<T>
 where T:NeuronPrimType<T> {
 
-	pub fn sigmod_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	pub fn sigmod_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 						  -> Vec<Tensor<T>> {
-		let one = Tensor::<T>::one(inputs[0].shape());
-		vec![Tensor::<T>::hadamard_division(&one,
-											&(&one + inputs[0].neg().exp()))]
+		vec![inputs[0].sigmoid()]
 	}
 	pub fn sigmod_backward(inputs: &Vec<NNNeuron<T>>,
 						   grads: &Vec<NNNeuron<T>>,
-						   _opt: &Option<SynapseOption>)
+						   opt: &Option<SynapseOption<T>>)
 					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
@@ -25,17 +23,30 @@ where T:NeuronPrimType<T> {
 			return (sns, outputs)
 		}
 
+		let so = if let Some(n) = opt {
+			n
+		}
+		else {
+			panic!("this node dose not have option. {}:{}\n", file!(), line!())
+		};
+
+		let forward_result = match so {
+			SynapseOption::Sigmoid(n) => Rc::clone(&n),
+			_ => panic!("invalid option. {}:{}\n", file!(), line!())
+		};
+
 		let y_shape = inputs[0].borrow().shape().to_vec();
 		outputs.push(Rc::clone(&grads[0]));
 
 		let one = nn_neuron_constant("1.0", Tensor::<T>::one(&y_shape));
 		outputs.push(Rc::clone(&one));
 
-		let (sn, output) = Self::sub(one, Rc::clone(&inputs[0]));
+		outputs.push(Rc::clone(&forward_result));
+		let (sn, output) = Self::sub(one, Rc::clone(&forward_result));
 		sns.push(sn);
 		outputs.push(Rc::clone(&output));
 
-		let (sn, output) = Self::hadamard_product(Rc::clone(&inputs[0]),Rc::clone(&output));
+		let (sn, output) = Self::hadamard_product(Rc::clone(&forward_result),Rc::clone(&output));
 		sns.push(sn);
 		outputs.push(Rc::clone(&output));
 
@@ -43,15 +54,17 @@ where T:NeuronPrimType<T> {
 		sns.push(sn);
 		outputs.push(Rc::clone(&gy));
 
-		{
+	{
 			let mut n = inputs[0].borrow_mut();
 			if let Some(ref g) = n.ref_grad(){
 				let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&gy));
 				sns.push(sn);
+				output.borrow_mut().rename(&format!("{}+", g.borrow().name()));
 				outputs.push(Rc::clone(&output));
 				n.set_grad(output)
 			}
 			else {
+				gy.borrow_mut().rename(&format!("({})'", n.name()));
 				n.set_grad(gy)
 			}
 		}
@@ -62,8 +75,10 @@ where T:NeuronPrimType<T> {
 	pub fn sigmod(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "sigmod";
 		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
-		let s = Synapse::<T>::new(Self::sigmod_forward,
-								  Self::sigmod_backward);
+		let so = SynapseOption::Sigmoid(Rc::clone(&output));
+		let s = Synapse::<T>::new_with_option(Self::sigmod_forward,
+											  Self::sigmod_backward,
+											  so);
 		let sn = SynapseNode::<T>::new(&label, vec![Rc::clone(&x)], vec![Rc::clone(&output)], s);
 		let rsn = Rc::new(RefCell::new(sn));
 		output.borrow_mut().set_generator(Rc::clone(&rsn));

@@ -6,24 +6,26 @@ use linear_transform::tensor::Tensor;
 
 use crate::neuron::{NeuronPrimType,NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 
-pub enum SynapseOption {
+pub enum SynapseOption<T>
+where T:NeuronPrimType<T> {
 	BroadcastTo((Vec<usize>,Vec<usize>)),
 	Reshape((Vec<usize>,Vec<usize>)),
-	Sum((Vec<usize>,Vec<usize>))
+	Sum((Vec<usize>,Vec<usize>)),
+	Sigmoid(NNNeuron<T>)
 }
 
-pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption>)
+pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption<T>>)
 							  -> Vec<Tensor<T>>;
 pub type MakeDiffNode<T> = fn (inputs: &Vec<NNNeuron<T>>,
 							   grads: &Vec<NNNeuron<T>>,
-							   synapse_opt: &Option<SynapseOption>)
+							   synapse_opt: &Option<SynapseOption<T>>)
 							   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>);
 
 pub struct Synapse<T>
 where T:NeuronPrimType<T> {
 	forward: ForwardProp<T>,
 	make_diff_node: MakeDiffNode<T>,
-	synapse_opt: Option<SynapseOption>
+	synapse_opt: Option<SynapseOption<T>>
 }
 
 impl<T> Synapse<T>
@@ -38,14 +40,14 @@ where T:NeuronPrimType<T> {
 	}
 	pub fn new_with_option(forward: ForwardProp<T>,
 						   make_diff_node: MakeDiffNode<T>,
-						   opt: SynapseOption) -> Synapse<T> {
+						   opt: SynapseOption<T>) -> Synapse<T> {
 		Synapse {
 			forward,
 			make_diff_node,
 			synapse_opt: Some(opt)
 		}
 	}
-	pub fn ref_option(&self) -> &Option<SynapseOption> {
+	pub fn ref_option(&self) -> &Option<SynapseOption<T>> {
 		&self.synapse_opt
 	}
 }

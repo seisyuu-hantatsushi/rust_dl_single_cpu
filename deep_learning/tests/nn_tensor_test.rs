@@ -23,6 +23,20 @@ impl Display for MyError {
 
 impl Error for MyError {}
 
+fn differntial(f: &(dyn Fn(&Tensor::<f64>) -> Tensor::<f64>),
+			   x:&Tensor::<f64>,
+			   delta:f64 ) -> Tensor::<f64> {
+	println!("{}",x);
+
+	let x_shape = x.shape();
+	let delta_t = Tensor::<f64>::new_set_value(x_shape, delta);
+	let x_forward  = x + &delta_t;
+	let x_backward = x - &delta_t;
+	let y_forward = f(&x_forward);
+	let y_backward = f(&x_backward);
+	(y_forward - y_backward).scale(1.0/(2.0*delta))
+}
+
 #[test]
 fn reshape_test() -> Result<(),Box<dyn std::error::Error>> {
     let mut nn = NeuralNetwork::<f64>::new();
@@ -373,20 +387,31 @@ fn matmul_test() -> Result<(),Box<dyn std::error::Error>> {
 fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
 	{
 		let mut nn = NeuralNetwork::<f64>::new();
-		let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[2,3],&[1.0,2.0,3.0,4.0,5.0,6.0]));
+		let xs:Vec<f64> = vec![1.0,2.0,3.0,4.0,5.0,6.0];
+		let x = nn.create_neuron("x", Tensor::<f64>::from_vector(vec![2,3],xs.clone()));
 		let y = nn.sigmod(Rc::clone(&x));
 
+		fn sigmoid(x:&Tensor<f64>) -> Tensor<f64> {
+			Tensor::<f64>::sigmoid(x)
+		}
+
 		println!("y {}", y.borrow());
+		let x_sigmoids = xs.iter().map(|x| 1.0/(1.0+(-x).exp())).collect::<Vec<f64>>();
+		{
+			let borrowed_y =  y.borrow();
+			let ys = borrowed_y.ref_signal().buffer().clone();
+			assert_eq!(ys,x_sigmoids);
+		}
 
 		nn.backward_propagating(0)?;
 
 		let borrowed_x = x.borrow();
 		if let Some(ref gx) = borrowed_x.ref_grad() {
-			println!("gx {}",gx.borrow().ref_signal());
-			let x_t = Tensor::<f64>::from_array(&[2,3],&[1.0,2.0,3.0,4.0,5.0,6.0]);
-			let one = Tensor::<f64>::one(&[2,3]);
-			let gx_t = Tensor::<f64>::hadamard_product(&x_t, &(&one - &x_t));
-			assert_eq!(gx.borrow().ref_signal(), &gx_t)
+			let diff = differntial(&sigmoid,
+								   borrowed_x.ref_signal(),
+								   0.001);
+			let error = (diff - gx.borrow().ref_signal()).abs();
+			assert!(error.buffer().iter().fold(false,|b, &e| { b | (e < 0.0001)}));
 		}
 		else {
 			assert!(false);

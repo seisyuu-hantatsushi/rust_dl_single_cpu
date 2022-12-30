@@ -11,7 +11,7 @@ where T:NeuronPrimType<T> {
 
 	fn mul_rank0_make_diff_node(inputs: &Vec<NNNeuron<T>>,
 								grads: &Vec<NNNeuron<T>>,
-								_opt:&Option<SynapseOption>) -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
+								_opt:&Option<SynapseOption<T>>) -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 

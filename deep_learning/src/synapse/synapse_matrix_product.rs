@@ -9,14 +9,14 @@ use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 impl<T> SynapseNode<T>
 where T:NeuronPrimType<T> {
 
-	fn matrix_product_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	fn matrix_product_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 							  -> Vec<Tensor<T>> {
 		vec![Tensor::<T>::matrix_product(inputs[0], inputs[1])]
 	}
 
 	fn matrix_product_backward(inputs: &Vec<NNNeuron<T>>,
 							   grads: &Vec<NNNeuron<T>>,
-							   _opt: &Option<SynapseOption>)
+							   _opt: &Option<SynapseOption<T>>)
 							   -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>){
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();

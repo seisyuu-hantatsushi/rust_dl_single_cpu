@@ -9,7 +9,7 @@ use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 impl<T> SynapseNode<T>
 where T:NeuronPrimType<T> {
 
-	fn mse_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	fn mse_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 				   -> Vec<Tensor<T>> {
 		let diff = inputs[0] - inputs[1];
 		let one = num::one::<T>();
@@ -22,7 +22,7 @@ where T:NeuronPrimType<T> {
 
 	fn mse_backward(inputs: &Vec<NNNeuron<T>>,
 					grads: &Vec<NNNeuron<T>>,
-					_opt: &Option<SynapseOption>)
+					_opt: &Option<SynapseOption<T>>)
 					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
@@ -30,7 +30,10 @@ where T:NeuronPrimType<T> {
 		if inputs[0].borrow().is_constant() && inputs[1].borrow().is_constant() {
 			return (sns,outputs);
 		}
+
 		outputs.push(Rc::clone(&grads[0]));
+		outputs.push(Rc::clone(&inputs[0]));
+		outputs.push(Rc::clone(&inputs[1]));
 		let (sn, diff) = Self::sub(Rc::clone(&inputs[0]), Rc::clone(&inputs[1]));
 		sns.push(sn);
 		outputs.push(Rc::clone(&diff));

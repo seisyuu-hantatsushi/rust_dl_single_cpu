@@ -10,14 +10,14 @@ use crate::neuron::{NNNeuron, nn_neuron_new, nn_neuron_constant};
 impl<T> SynapseNode<T>
 where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone + fmt::Display {
 
-	fn pow_rank0_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	fn pow_rank0_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 						 -> Vec<Tensor<T>> {
 		vec![inputs[0].pow_rank0(inputs[1][vec![0,0]])]
 	}
 
 	fn pow_rank0_backward(inputs: &Vec<NNNeuron<T>>,
 						  grads: &Vec<NNNeuron<T>>,
-						  _opt: &Option<SynapseOption>)
+						  _opt: &Option<SynapseOption<T>>)
 						  -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>){
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
@@ -103,14 +103,14 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 		(rs, output)
 	}
 
-	fn pow_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	fn pow_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 				   -> Vec<Tensor<T>> {
 		vec![inputs[0].pow(inputs[1][vec![0,0]])]
 	}
 
 	fn pow_backward(inputs: &Vec<NNNeuron<T>>,
 					grads: &Vec<NNNeuron<T>>,
-					_opt: &Option<SynapseOption>)
+					_opt: &Option<SynapseOption<T>>)
 					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>){
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();

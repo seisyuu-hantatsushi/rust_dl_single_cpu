@@ -9,7 +9,7 @@ use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 impl<T> SynapseNode<T>
 where T:NeuronPrimType<T> {
 
-	fn hadamard_product_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	fn hadamard_product_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 								-> Vec<Tensor<T>> {
 		let left_shape  = inputs[0].shape().to_vec();
 		let right_shape = inputs[1].shape().to_vec();
@@ -30,7 +30,7 @@ where T:NeuronPrimType<T> {
 
 	fn hadamard_product_backward(inputs: &Vec<NNNeuron<T>>,
 								 grads: &Vec<NNNeuron<T>>,
-								 _opt: &Option<SynapseOption>)
+								 _opt: &Option<SynapseOption<T>>)
 								 -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>){
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
@@ -166,7 +166,7 @@ where T:NeuronPrimType<T> {
 		(rsn, output)
 	}
 
-	fn hadamard_division_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption>)
+	fn hadamard_division_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 								-> Vec<Tensor<T>> {
 		let left_shape  = inputs[0].shape().to_vec();
 		let right_shape = inputs[1].shape().to_vec();
@@ -187,7 +187,7 @@ where T:NeuronPrimType<T> {
 
 	fn hadamard_division_backward(inputs: &Vec<NNNeuron<T>>,
 								  grads: &Vec<NNNeuron<T>>,
-								  _opt: &Option<SynapseOption>)
+								  _opt: &Option<SynapseOption<T>>)
 								  -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
