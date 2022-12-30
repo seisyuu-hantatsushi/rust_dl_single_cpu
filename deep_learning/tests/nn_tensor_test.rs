@@ -4,6 +4,10 @@ use std::fmt::Display;
 use std::rc::Rc;
 use std::error::Error;
 
+use rand::SeedableRng;
+use rand_distr::{Normal, Uniform, Distribution};
+use rand_xorshift::XorShiftRng;
+
 use deep_learning::neural_network::NeuralNetwork;
 use linear_transform::Tensor;
 
@@ -26,8 +30,6 @@ impl Error for MyError {}
 fn differntial(f: &(dyn Fn(&Tensor::<f64>) -> Tensor::<f64>),
 			   x:&Tensor::<f64>,
 			   delta:f64 ) -> Tensor::<f64> {
-	println!("{}",x);
-
 	let x_shape = x.shape();
 	let delta_t = Tensor::<f64>::new_set_value(x_shape, delta);
 	let x_forward  = x + &delta_t;
@@ -423,45 +425,88 @@ fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
 #[test]
 fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
 	{
+		let mut rng = XorShiftRng::from_entropy();
+		let uniform_dist = Uniform::new(-1.0,1.0);
+		let xs:Vec<f64> = (0..100).map(|_| uniform_dist.sample(&mut rng)).collect();
+		let ws:Vec<f64> = (0..10).map(|_| uniform_dist.sample(&mut rng)).collect();
 		let mut nn = NeuralNetwork::<f64>::new();
-		let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[10,1],&[2.0f64;10]));
-		let w = nn.create_neuron("w", Tensor::<f64>::from_array(&[1,10],&[3.0f64;10]));
-		let b = nn.create_neuron("b", Tensor::<f64>::from_array(&[ 1,1],&[2.0f64;1]));
+		let x = nn.create_neuron("x", Tensor::<f64>::from_vector(vec![100,1],xs));
+		let w = nn.create_neuron("w", Tensor::<f64>::from_vector(vec![1,10],ws));
+		let b = nn.create_neuron("b", Tensor::<f64>::from_array(&[ 1,1],&[uniform_dist.sample(&mut rng)]));
 
 		let y = nn.affine(Rc::clone(&x),Rc::clone(&w),Rc::clone(&b));
 
-		println!("y {}", y.borrow());
+		fn affine(x:&Tensor<f64>, w:&Tensor<f64>, b:&Tensor<f64>) -> Tensor<f64> {
+			let xw = Tensor::<f64>::matrix_product(x,w);
+			let expand_b = b.broadcast(xw.shape());
+			xw+expand_b
+		};
 
-		assert_eq!(y.borrow().ref_signal(),
-				   &Tensor::<f64>::from_array(&[10,10],&[8.0f64;100]));
-
+		{
+			let borrowed_x = x.borrow();
+			let borrowed_w = w.borrow();
+			let borrowed_b = b.borrow();
+			let borrowed_y = y.borrow();
+			assert_eq!(borrowed_y.ref_signal(),
+					   &affine(borrowed_x.ref_signal(), borrowed_w.ref_signal(), borrowed_b.ref_signal()));
+		}
 		nn.backward_propagating(0)?;
 
-		let borrowed_x = x.borrow();
-		if let Some(ref gx) = borrowed_x.ref_grad() {
-			println!("gx {}",gx.borrow().ref_signal());
-		}
-		else {
-			assert!(false);
+		{
+			let borrowed_x = x.borrow();
+			if let Some(ref gx) = borrowed_x.ref_grad() {
+				let borrowed_w = w.borrow();
+				let borrowed_b = b.borrow();
+				let affine_x = |x:&Tensor<f64>| -> Tensor<f64> {
+					affine(x, borrowed_w.ref_signal(), borrowed_b.ref_signal())
+				};
+				let delta = 0.001;
+				let diff = differntial(&affine_x, borrowed_x.ref_signal(), delta);
+				let diff = diff.sum(borrowed_x.shape());
+				let error = (diff - gx.borrow().ref_signal()).abs();
+				assert!(error.buffer().iter().fold(false,|b, &e| { b | (e < 0.0001)}));
+			}
+			else {
+				assert!(false);
+			}
 		}
 
-		let borrowed_w = w.borrow();
-		if let Some(ref gw) = borrowed_w.ref_grad() {
-			println!("gw {}",gw.borrow().ref_signal());
-			
-		}
-		else {
-			assert!(false);
+		{
+			let borrowed_w = w.borrow();
+			if let Some(ref gw) = borrowed_w.ref_grad() {
+				let borrowed_x = x.borrow();
+				let borrowed_b = b.borrow();
+				let affine_w = |w:&Tensor<f64>| -> Tensor<f64> {
+					affine(borrowed_x.ref_signal(), w, borrowed_b.ref_signal())
+				};
+				let delta = 0.001;
+				let diff = differntial(&affine_w, borrowed_w.ref_signal(), delta);
+				let diff = diff.sum(borrowed_w.shape());
+				let error = (diff - gw.borrow().ref_signal()).abs();
+				assert!(error.buffer().iter().fold(false,|b, &e| { b | (e < 0.0001)}));
+			}
+			else {
+				assert!(false);
+			}
 		}
 
-		let borrowed_b = b.borrow();
-		if let Some(ref gb) = borrowed_b.ref_grad() {
-			println!("gb {}",gb.borrow().ref_signal());
-			let gb_t = Tensor::<f64>::from_array(&[1,1], &[100.0]);
-			assert_eq!(gb.borrow().ref_signal(), &gb_t)
-		}
-		else {
-			assert!(false);
+		{
+			let borrowed_b = b.borrow();
+			if let Some(ref gb) = borrowed_b.ref_grad() {
+				let borrowed_x = x.borrow();
+				let borrowed_w = w.borrow();
+				let affine_b = |b:&Tensor<f64>| -> Tensor<f64> {
+					affine(borrowed_x.ref_signal(), borrowed_w.ref_signal(), b)
+				};
+				let delta = 0.001;
+				let diff = differntial(&affine_b, borrowed_b.ref_signal(), delta);
+				let diff = diff.sum(borrowed_b.shape());
+				let error = (diff - gb.borrow().ref_signal()).abs();
+				assert!(error.buffer().iter().fold(false,|b, &e| { b | (e < 0.0001)}));
+			}
+			else {
+				assert!(false);
+			}
 		}
 	}
 	Ok(())
