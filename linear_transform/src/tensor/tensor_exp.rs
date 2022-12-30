@@ -16,7 +16,7 @@ where T:num::Float+Clone+Copy {
 	let one:T = num::one();
 	let b:&[T] = self.buffer();
 	let v = b.iter().map(|&b| {
-	    let neg_b:T = (num::zero::<T>() - one) * b;
+	    let neg_b:T = num::zero::<T>() - b;
 	    one/(one + (neg_b.exp()))
 	}).collect::<Vec<T>>();
 	Tensor::from_vector(self.shape().to_vec(), v)
