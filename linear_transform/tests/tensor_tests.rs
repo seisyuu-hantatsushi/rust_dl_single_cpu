@@ -58,7 +58,7 @@ fn tensor_test() {
 
     let mut t = Tensor::<f32>::from_array(&[2,3,3,4],&m_init);
     assert_eq!(t[vec![0,2,2,3]],1334.0);
-    t.set(vec![0,2,2,3], 0.0);
+    t.set(&[0,2,2,3], 0.0);
     assert_eq!(t[vec![0,2,2,3]],0.0);
     t[vec![0,2,2,3]] = 1335.0;
     assert_eq!(t[vec![0,2,2,3]],1335.0);
@@ -107,4 +107,18 @@ fn tensor_index_to_position() {
 
     let v = t.index_to_position(2*5*4*6);
     assert!(v.is_empty());
+}
+
+#[test]
+fn tensor_index_test () {
+    let xs = (0usize..(3*6*4*2)).map(|i| i as f64).collect::<Vec<f64>>();
+    let mut x = Tensor::<f64>::from_vector(vec![3,6,4,2], xs);
+
+    let index = vec![2,3,3,0];
+    assert_eq!(x[index.clone()], (index[0]*6*4*2+index[1]*4*2+index[2]*2+index[3]) as f64);
+
+    let index = vec![2,3,2,0];
+    x[index.clone()] = 2.0;
+
+    assert_eq!(x[index.clone()], 2.0);
 }
