@@ -10,7 +10,7 @@ where T:num::Num+Clone+Copy {
 		assert_eq!(self.buffer().len(), shape.iter().fold(1,|prod,d| { prod * (*d) }));
 		Tensor::from_vector(shape.to_vec(), self.buffer().to_vec())
     }
-	
+
     fn sum_subtensor(v:&[T],
 					 src_shape:&[usize],
 					 dst_shape:&[usize]) -> Tensor<T> {
@@ -99,7 +99,7 @@ where T:num::Num+Clone+Copy {
 		assert_eq!(shape.len(),self.shape().len());
 		for (o,s) in self.shape().iter().zip(shape.iter()) {
 			if !(o == s || *s == 1) {
-				panic!("invalid shape");
+				panic!("invalid shape {} {}",o,s);
 			}
 		}
 		Self::sum_subtensor(self.buffer(), self.shape(), shape)
@@ -204,11 +204,11 @@ fn tensor_reshape_test () {
 	let t1 = t0.sum(&[3,1,4]);
 	println!("sum [3,1,4] {}", t1);
 
-	let t1 = t0.sum(&[3,1,1]);
-	println!("sum [3,1,1] {}", t1);
+		let t1 = t0.sum(&[3,1,1]);
+		println!("sum [3,1,1] {}", t1);
 
-	let t1 = t0.sum(&[1,3,1]);
-	println!("sum [1,3,1] {}", t1);
+		let t1 = t0.sum(&[1,3,1]);
+		println!("sum [1,3,1] {}", t1);
 
     }
 
