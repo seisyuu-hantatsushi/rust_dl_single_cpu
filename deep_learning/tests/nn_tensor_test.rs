@@ -11,6 +11,12 @@ use rand_xorshift::XorShiftRng;
 use deep_learning::neural_network::NeuralNetwork;
 use linear_transform::Tensor;
 
+use plotters::prelude::{Circle, BitMapBackend,ChartBuilder,PathElement};
+use plotters::prelude::{SeriesLabelPosition};
+use plotters::prelude::full_palette::*;
+use plotters::drawing::IntoDrawingArea;
+use plotters::style::{IntoFont,Color};
+
 #[derive(Debug)]
 enum MyError {
 	StringMsg(String)
@@ -31,12 +37,35 @@ fn differntial(f: &(dyn Fn(&Tensor::<f64>) -> Tensor::<f64>),
 			   x:&Tensor::<f64>,
 			   delta:f64 ) -> Tensor::<f64> {
 	let x_shape = x.shape();
-	let delta_t = Tensor::<f64>::new_set_value(x_shape, delta);
-	let x_forward  = x + &delta_t;
-	let x_backward = x - &delta_t;
-	let y_forward = f(&x_forward);
-	let y_backward = f(&x_backward);
-	(y_forward - y_backward).scale(1.0/(2.0*delta))
+	let mut diff = Tensor::<f64>::zero(x_shape);
+
+	for i in 0..x.num_of_elements() {
+		let mut x_forward  = x.clone();
+		let mut x_backward = x.clone();
+
+		let pos = x.index_to_position(i);
+		x_forward[pos.clone()]  = x_forward[pos.clone()]  + delta;
+		x_backward[pos.clone()] = x_backward[pos.clone()] - delta;
+
+		let y_forward  = f(&x_forward);
+		let y_backward = f(&x_backward);
+
+		let dt = (y_forward - y_backward).scale(1.0/(2.0*delta));
+
+		if dt.num_of_elements() == 1 {
+			diff[pos.clone()] = dt[vec![0,0]];
+		}
+		else {
+			if x.shape() != dt.shape() {
+				let t = dt.sum(x.shape());
+				diff[pos.clone()] = t[pos.clone()];
+			}
+			else {
+				diff[pos.clone()] = dt[pos.clone()];
+			}
+		}
+	}
+	diff
 }
 
 #[test]
@@ -391,7 +420,7 @@ fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
 		let mut nn = NeuralNetwork::<f64>::new();
 		let xs:Vec<f64> = vec![1.0,2.0,3.0,4.0,5.0,6.0];
 		let x = nn.create_neuron("x", Tensor::<f64>::from_vector(vec![2,3],xs.clone()));
-		let y = nn.sigmod(Rc::clone(&x));
+		let y = nn.sigmoid(Rc::clone(&x));
 
 		fn sigmoid(x:&Tensor<f64>) -> Tensor<f64> {
 			Tensor::<f64>::sigmoid(x)
@@ -419,6 +448,36 @@ fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
 			assert!(false);
 		}
 	}
+	{
+		let mut rng = XorShiftRng::from_entropy();
+		let uniform_dist = Uniform::new(-6.0,6.0);
+		let mut nn = NeuralNetwork::<f64>::new();
+		let xs:Vec<f64> = (0..1000).map(|_| uniform_dist.sample(&mut rng)).collect();
+		let x = nn.create_neuron("x", Tensor::<f64>::from_vector(vec![1,1000],xs.clone()));
+		let y = nn.sigmoid(Rc::clone(&x));
+
+		let borrowed_y = y.borrow();
+		let data_points:Vec<(&f64,&f64)> = xs.iter().zip(borrowed_y.ref_signal().buffer().into_iter()).collect();
+		let render_backend = BitMapBackend::new("sigmoid_graph.png", (640, 480)).into_drawing_area();
+		render_backend.fill(&WHITE);
+		let mut chart_builder = ChartBuilder::on(&render_backend)
+			.caption("sigmoid(x)", ("sans-serif", 40).into_font())
+			.margin(5)
+			.x_label_area_size(30)
+			.y_label_area_size(30)
+			.build_cartesian_2d(-6.0f32..6.0f32, 0.0f32..1.0f32)?;
+		chart_builder.configure_mesh().draw()?;
+		chart_builder.draw_series(data_points.iter().map(|(x,y)| Circle::new((**x as f32,**y as f32), 2, GREEN.filled())))?;
+		/*
+		chart_builder
+			.configure_series_labels()
+			.position(SeriesLabelPosition::UpperLeft)
+			.background_style(&WHITE.mix(0.8))
+			.border_style(&BLACK)
+			.draw()?;
+*/
+		render_backend.present()?;
+	}
 	Ok(())
 }
 
@@ -427,8 +486,9 @@ fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
 	{
 		let mut rng = XorShiftRng::from_entropy();
 		let uniform_dist = Uniform::new(-1.0,1.0);
+		let normal_dist = Normal::new(0.0,1.0)?;
 		let xs:Vec<f64> = (0..100).map(|_| uniform_dist.sample(&mut rng)).collect();
-		let ws:Vec<f64> = (0..10).map(|_| uniform_dist.sample(&mut rng)).collect();
+		let ws:Vec<f64> = (0..10).map(|_| normal_dist.sample(&mut rng)).collect();
 		let mut nn = NeuralNetwork::<f64>::new();
 		let x = nn.create_neuron("x", Tensor::<f64>::from_vector(vec![100,1],xs));
 		let w = nn.create_neuron("w", Tensor::<f64>::from_vector(vec![1,10],ws));
@@ -440,7 +500,7 @@ fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
 			let xw = Tensor::<f64>::matrix_product(x,w);
 			let expand_b = b.broadcast(xw.shape());
 			xw+expand_b
-		};
+		}
 
 		{
 			let borrowed_x = x.borrow();
@@ -462,7 +522,6 @@ fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
 				};
 				let delta = 0.001;
 				let diff = differntial(&affine_x, borrowed_x.ref_signal(), delta);
-				let diff = diff.sum(borrowed_x.shape());
 				let error = (diff - gx.borrow().ref_signal()).abs();
 				assert!(error.buffer().iter().fold(false,|b, &e| { b | (e < 0.0001)}));
 			}
@@ -508,6 +567,67 @@ fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
 				assert!(false);
 			}
 		}
+	}
+	Ok(())
+}
+
+#[test]
+fn mean_square_error_test() -> Result<(),Box<dyn std::error::Error>> {
+
+	{
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x0 = nn.create_neuron("x0", Tensor::<f64>::from_array(&[1,3],&[0.0,1.0,2.0]));
+		let x1 = nn.create_constant("x1", Tensor::<f64>::from_array(&[1,3],&[0.0,1.0,2.0]));
+
+		let e = {
+			let borrowed_x0 = x0.borrow();
+			let borrowed_x1 = x1.borrow();
+			let x0_signal = borrowed_x0.ref_signal();
+			let x1_signal = borrowed_x1.ref_signal();
+			(x0_signal-x1_signal).pow(2.0).sum(&[1,1]).scale(1.0/(x0_signal.num_of_elements() as f64))
+		};
+		let mse = nn.mean_square_error(Rc::clone(&x0),Rc::clone(&x1));
+		assert_eq!(mse.borrow().ref_signal(), &e);
+	}
+	{
+		let mut rng = XorShiftRng::from_entropy();
+		let uniform_dist = Uniform::new(-1.0,1.0);
+
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x0 = nn.create_neuron("x0", Tensor::<f64>::from_vector(vec![1,100],
+																   (0..100).map(|_| uniform_dist.sample(&mut rng)).collect::<Vec<f64>>()));
+		let x1 = nn.create_constant("x1", Tensor::<f64>::from_vector(vec![1,100],
+																	 (0..100).map(|_| uniform_dist.sample(&mut rng)).collect::<Vec<f64>>()));
+
+		let e = {
+			let borrowed_x0 = x0.borrow();
+			let borrowed_x1 = x1.borrow();
+			let x0_signal = borrowed_x0.ref_signal();
+			let x1_signal = borrowed_x1.ref_signal();
+			(x0_signal-x1_signal).pow(2.0).sum(&[1,1]).scale(1.0/(x0_signal.num_of_elements() as f64))
+		};
+		let mse = nn.mean_square_error(Rc::clone(&x0),Rc::clone(&x1));
+		assert_eq!(mse.borrow().ref_signal(), &e);
+
+		nn.backward_propagating(0)?;
+
+		let mse_x0 = |x0:&Tensor::<f64>| -> Tensor::<f64> {
+			let borrowed_x1 = x1.borrow();
+			let x1_signal = borrowed_x1.ref_signal();
+			(x0 - x1_signal).pow(2.0).sum(&[1,1]).scale(1.0/(x0.num_of_elements() as f64))
+		};
+
+		let borrowed_x0 = x0.borrow();
+		if let Some(ref gx0) = borrowed_x0.ref_grad() {
+			let delta:f64 = 1.0e-5;
+			let diff_mes_x0 = differntial(&mse_x0,borrowed_x0.ref_signal(),delta);
+			let error = (diff_mes_x0 - gx0.borrow().ref_signal()).abs();
+			assert!(error.buffer().iter().fold(false,|b, &e| { b | (e < 0.00001)}));
+		}
+		else {
+			return Err(Box::new(MyError::StringMsg("no grad".to_string())));
+		}
+
 	}
 	Ok(())
 }

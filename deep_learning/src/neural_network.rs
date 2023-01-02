@@ -296,8 +296,8 @@ where T:NeuronPrimType<T> {
 		output
 	}
 
-	pub fn sigmod(&mut self, x:NNNeuron<T>) -> NNNeuron<T> {
-		let (sn,output) = SynapseNode::<T>::sigmod(x);
+	pub fn sigmoid(&mut self, x:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::sigmoid(x);
 		self.cg_order[0].append_nodes(vec![sn]);
 		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
 		output

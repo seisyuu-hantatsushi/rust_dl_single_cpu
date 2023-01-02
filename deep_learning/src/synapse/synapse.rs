@@ -11,7 +11,7 @@ where T:NeuronPrimType<T> {
 	BroadcastTo((Vec<usize>,Vec<usize>)),
 	Reshape((Vec<usize>,Vec<usize>)),
 	Sum((Vec<usize>,Vec<usize>)),
-	Sigmoid(NNNeuron<T>)
+	Scale(T)
 }
 
 pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption<T>>)
