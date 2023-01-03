@@ -494,7 +494,7 @@ fn affine_test() -> Result<(),Box<dyn std::error::Error>> {
 		let w = nn.create_neuron("w", Tensor::<f64>::from_vector(vec![1,10],ws));
 		let b = nn.create_neuron("b", Tensor::<f64>::from_array(&[ 1,1],&[uniform_dist.sample(&mut rng)]));
 
-		let y = nn.affine(Rc::clone(&x),Rc::clone(&w),Rc::clone(&b));
+		let y = nn.affine(Rc::clone(&x),Rc::clone(&w),Some(Rc::clone(&b)));
 
 		fn affine(x:&Tensor<f64>, w:&Tensor<f64>, b:&Tensor<f64>) -> Tensor<f64> {
 			let xw = Tensor::<f64>::matrix_product(x,w);
