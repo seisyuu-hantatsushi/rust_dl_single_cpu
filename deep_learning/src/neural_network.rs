@@ -119,7 +119,12 @@ where T:NeuronPrimType<T> {
 			else {
 				"orange"
 			};
-			let label = nref.name().to_string()+"\n"+"id="+&id_str;
+			let mut shape_str = "[".to_string();
+			for s in nref.ref_signal().shape().iter() {
+				shape_str = shape_str + &s.to_string() + ",";
+			}
+			shape_str = shape_str + "]";
+			let label = nref.name().to_string()+" "+&shape_str+"\n"+"id="+&id_str;
 			output = output.to_string() + "\"" + &id_str + "\"" + " [label=\"" + &label + "\", color=" + &color + ", style=filled]" + "\n";
 		}
 		for sn in self.synapse_nodes.values() {
