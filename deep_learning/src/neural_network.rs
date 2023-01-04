@@ -1,11 +1,11 @@
 /* -*- tab-width:4 -*- */
-use std::{fmt,fs};
+use std::fs;
 use std::io::Write;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::{BTreeSet,HashMap};
-use linear_transform::tensor::Tensor;
 
+use linear_transform::tensor::Tensor;
 use crate::neuron::{NeuronPrimType,NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 use crate::synapse::{NNSynapseNode,SynapseNode};
 
@@ -164,6 +164,7 @@ where T: NeuronPrimType<T>{
 
 impl<T> NeuralNetwork<T>
 where T:NeuronPrimType<T> {
+
 	pub fn new() -> NeuralNetwork<T> {
 		NeuralNetwork {
 			cg_order: vec![ComputationalGraph::<T>::new()]
@@ -273,7 +274,7 @@ where T:NeuronPrimType<T> {
 		output
 	}
 
-	pub fn affine(&mut self, x:NNNeuron<T>, w:NNNeuron<T>, b:NNNeuron<T>) -> NNNeuron<T> {
+	pub fn affine(&mut self, x:NNNeuron<T>, w:NNNeuron<T>, b:Option<NNNeuron<T>>) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::affine(x,w,b);
 		self.cg_order[0].append_nodes(vec![sn]);
 		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
@@ -343,6 +344,7 @@ where T:NeuronPrimType<T> {
 			Err("invalid order".to_string())
 		}
 	}
+
 	pub fn clear_grads(&mut self, order:usize) -> Result<(),String>{
 		if order < self.cg_order.len() {
 			self.cg_order[order].clear_grads();
