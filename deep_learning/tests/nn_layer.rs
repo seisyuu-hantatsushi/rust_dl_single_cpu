@@ -88,9 +88,10 @@ fn linear_layer_test() ->  Result<(),Box<dyn std::error::Error>> {
 
 		let pred_xs:Vec<f64> = (0..100).map(|i| (i as f64)/100.0).collect();
 		let pred_xt = Tensor::<f64>::from_vector(vec![100,1], pred_xs);
+
 		x.borrow_mut().assign(pred_xt.clone());
 		nn.forward_propagating(0)?;
-		let pred_yt = y.borrow().ref_signal().clone();
+		let pred_yt = pred_y[0].borrow().ref_signal().clone();
 		let pred_points: Vec<(&f64, &f64)> =
 			pred_xt.buffer().iter().zip(pred_yt.buffer().iter()).collect();
 
