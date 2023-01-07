@@ -362,7 +362,6 @@ fn matmul_test() -> Result<(),Box<dyn std::error::Error>> {
 		//println!("z {}", z.borrow());
 		assert_eq!(z.borrow().ref_signal(), &Tensor::<f64>::from_array(&[2,2], &[22.0,28.0,49.0,64.0]));
 		nn.backward_propagating(0)?;
-
 		let borrowed_x = x.borrow();
 		if let Some(ref gx) = borrowed_x.ref_grad() {
 			//println!("gx {}",gx.borrow().ref_signal());
@@ -459,7 +458,7 @@ fn sigmoid_test() -> Result<(),Box<dyn std::error::Error>> {
 		let borrowed_y = y.borrow();
 		let data_points:Vec<(&f64,&f64)> = xs.iter().zip(borrowed_y.ref_signal().buffer().into_iter()).collect();
 		let render_backend = BitMapBackend::new("sigmoid_graph.png", (640, 480)).into_drawing_area();
-		render_backend.fill(&WHITE);
+		render_backend.fill(&WHITE)?;
 		let mut chart_builder = ChartBuilder::on(&render_backend)
 			.caption("sigmoid(x)", ("sans-serif", 40).into_font())
 			.margin(5)

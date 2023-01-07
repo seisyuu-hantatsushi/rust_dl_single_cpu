@@ -11,7 +11,6 @@ use plotters::prelude::full_palette::*;
 use plotters::drawing::IntoDrawingArea;
 use plotters::style::{IntoFont,Color};
 
-
 #[derive(Debug)]
 enum MyError {
 	StringMsg(String)
@@ -28,58 +27,91 @@ impl Display for MyError {
 
 impl Error for MyError {}
 
+/*
+fn factorial(n:usize) -> usize {
+	if n == 0 {
+		return 1
+	}
+	else {
+		(1..=n).fold(1, |p, m| p*m)
+	}
+}
+
+fn permutation_size(n:usize, m:usize) -> usize {
+	factorial(n)/factorial(n-m)
+}
+
+fn combination_size(n:usize, m:usize) -> usize {
+	factorial(n)/(factorial(n-m)*factorial(m))
+}
+
+fn differnetial(n:usize, f:&(dyn Fn(f64)->f64),x:f64, delta:f64) -> f64 {
+	(0..=n).fold(0, |s,i| {
+		
+
+	})
+}
+ */
+
+fn differential(f:&(dyn Fn(f64)->f64), x:f64, delta:f64) -> f64 {
+	(f(x+delta) - f(x-delta))/(2.0*delta)
+}
+
+fn differential_2nd_order(f:&(dyn Fn(f64)->f64), x:f64, delta:f64) -> f64 {
+	(f(x+delta) + f(x-delta) - 2.0*f(x))/delta.powf(2.0)
+}
+
 #[test]
 #[ignore]
-fn high_order_diff() {
+fn high_order_diff() -> Result<(),Box<dyn std::error::Error>>{
 	let mut nn = NeuralNetwork::<f64>::new();
 	let x0 = 2.0;
 	let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
 	let c4 = nn.create_constant("4.0", Tensor::<f64>::from_array(&[1,1],&[4.0]));
 	let y = nn.pow_rank0(Rc::clone(&x),c4);
+	let delta = 1.0e-5;
+
+	fn f(x:f64) -> f64 {
+		x.powf(4.0)
+	}
 	y.borrow_mut().rename("y");
 
-	let _ = nn.clear_grads(0);
-	match nn.backward_propagating(0) {
-		Ok(outputs) => {
-			for output in outputs.iter() {
-				println!("gx1 {}",output.borrow());
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(0)?;
+	let gx = if let Some(ref gx) = x.borrow().ref_grad() {
+		Rc::clone(gx)
 	}
+	else {
+		return Err(Box::new(MyError::StringMsg("No 1st order diff of x".to_string())));
+	};
+	let diff = differential(&f, x0, delta);
+	assert!((gx.borrow().ref_signal()[vec![0,0]] - diff).abs() < delta);
 
 	let _ = nn.clear_grads(0);
 	let _ = nn.clear_grads(1);
-	match nn.backward_propagating(1) {
-		Ok(outputs) => {
-			for output in outputs.iter() {
-				println!("gx2 {}",output.borrow());
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(1)?;
+	let gx = if let Some(ref gx) = x.borrow().ref_grad() {
+		Rc::clone(gx)
 	}
+	else {
+		return Err(Box::new(MyError::StringMsg("No 2st order diff of x".to_string())));
+	};
+	let diff = differential_2nd_order(&f, x0, delta);
+	assert!((gx.borrow().ref_signal()[vec![0,0]] - diff).abs() < delta);
 
 	let _ = nn.clear_grads(0);
 	let _ = nn.clear_grads(1);
 	let _ = nn.clear_grads(2);
-	match nn.backward_propagating(2) {
-		Ok(outputs) => {
-			for output in outputs.iter() {
-				println!("gx3 {}",output.borrow());
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(2)?;
+	let gx = if let Some(ref gx) = x.borrow().ref_grad() {
+		Rc::clone(gx)
 	}
+	else {
+		return Err(Box::new(MyError::StringMsg("No 3st order diff of x".to_string())));
+	};
+	println!("gx3 {}", gx.borrow());
+	assert!((gx.borrow().ref_signal()[vec![0,0]] - 48.0).abs() < delta);
 
+/*
 	let _ = nn.clear_grads(0);
 	let _ = nn.clear_grads(1);
 	let _ = nn.clear_grads(2);
@@ -174,11 +206,13 @@ fn high_order_diff() {
 		println!("{}",e);
 		assert!(false)
 	}
+	 */
+	Ok(())
 }
 
 #[test]
 #[ignore]
-fn sphere_test(){
+fn sphere_test() -> Result<(),Box<dyn std::error::Error>> {
 	//sphere
 	let mut nn = NeuralNetwork::<f64>::new();
 	let (x0,y0) = (1.0,1.0);
@@ -196,41 +230,36 @@ fn sphere_test(){
 
 	println!("z {}\n{}",sphere(x0,y0), z.borrow());
 
-	match nn.backward_propagating(0) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let delta = 1.0e-5;
-				let diff = (sphere(x0+delta,y0)-sphere(x0-delta,y0))/(2.0*delta);
-				println!("gx {} {}", g.borrow(), diff);
-				let gx = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gx).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			};
-			let borrowed_y = y.borrow();
-			if let Some(ref g) = borrowed_y.ref_grad() {
-				let delta = 1.0e-5;
-				let diff = (sphere(x0,y0+delta)-sphere(x0,y0-delta))/(2.0*delta);
-				println!("gy {} {}", g.borrow(), diff);
-				let gy = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gy).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(0)?;
+	let borrowed_x = x.borrow();
+	if let Some(ref g) = borrowed_x.ref_grad() {
+		let delta = 1.0e-5;
+		let diff = (sphere(x0+delta,y0)-sphere(x0-delta,y0))/(2.0*delta);
+		println!("gx {} {}", g.borrow(), diff);
+		let gx = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff-gx).abs() <= delta);
 	}
+	else {
+		assert!(false);
+	};
+
+	let borrowed_y = y.borrow();
+	if let Some(ref g) = borrowed_y.ref_grad() {
+		let delta = 1.0e-5;
+		let diff = (sphere(x0,y0+delta)-sphere(x0,y0-delta))/(2.0*delta);
+		println!("gy {} {}", g.borrow(), diff);
+		let gy = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff-gy).abs() <= delta);
+	}
+	else {
+		assert!(false);
+	};
+	Ok(())
 }
 
 #[test]
 #[ignore]
-fn matyas_test(){
+fn matyas_test() -> Result<(),Box<dyn std::error::Error>> {
 	//matyas
 	let mut nn = NeuralNetwork::<f64>::new();
 	let (x0,y0) = (1.0,1.0);
@@ -254,41 +283,36 @@ fn matyas_test(){
 
 	println!("matyas z {}\n{}",matyas(x0,y0), z.borrow());
 
-	match nn.backward_propagating(0) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let delta = 1.0e-6;
-				let diff = (matyas(x0+delta,y0)-matyas(x0-delta,y0))/(2.0*delta);
-				println!("matyas gx {} {}", g.borrow(), diff);
-				let gx = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gx).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			};
-			let borrowed_y = y.borrow();
-			if let Some(ref g) = borrowed_y.ref_grad() {
-				let delta = 1.0e-6;
-				let diff = (matyas(x0,y0+delta)-matyas(x0,y0-delta))/(2.0*delta);
-				println!("matyas gy {} {}", g.borrow(), diff);
-				let gy = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gy).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			}
-				},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(0)?;
+
+	let borrowed_x = x.borrow();
+	if let Some(ref g) = borrowed_x.ref_grad() {
+		let delta = 1.0e-6;
+		let diff = (matyas(x0+delta,y0)-matyas(x0-delta,y0))/(2.0*delta);
+		println!("matyas gx {} {}", g.borrow(), diff);
+		let gx = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff-gx).abs() <= delta);
 	}
-	println!("");
+	else {
+		assert!(false);
+	};
+	let borrowed_y = y.borrow();
+	if let Some(ref g) = borrowed_y.ref_grad() {
+		let delta = 1.0e-6;
+		let diff = (matyas(x0,y0+delta)-matyas(x0,y0-delta))/(2.0*delta);
+		println!("matyas gy {} {}", g.borrow(), diff);
+		let gy = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff-gy).abs() <= delta);
+	}
+	else {
+		assert!(false);
+	};
+
+	Ok(())
 }
 
 #[test]
-fn goldstein_price_test() {
+fn goldstein_price_test() -> Result<(),Box<dyn std::error::Error>> {
     //Goldstein-Price
     let mut nn = NeuralNetwork::<f64>::new();
     let (x0,y0) = (1.0,1.0);
@@ -354,41 +378,37 @@ fn goldstein_price_test() {
     z.borrow_mut().rename("z");
     println!("gs {} \n{}", goldstein_price(x0, y0), z.borrow());
 
-	match nn.backward_propagating(0) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let delta = 1.0e-6;
-				let diff = (goldstein_price(x0+delta,y0)-goldstein_price(x0-delta,y0))/(2.0*delta);
-				println!("gs gx {} {}", g.borrow(), diff);
-				let gx = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gx).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			};
-			let borrowed_y = y.borrow();
-			if let Some(ref g) = borrowed_y.ref_grad() {
-				let delta = 1.0e-6;
-				let diff = (goldstein_price(x0,y0+delta)-goldstein_price(x0,y0-delta))/(2.0*delta);
-				println!("gs gy {} {}", g.borrow(), diff);
-				let gy = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gy).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(0)?;
+
+	let borrowed_x = x.borrow();
+	if let Some(ref g) = borrowed_x.ref_grad() {
+		let delta = 1.0e-6;
+		let diff = (goldstein_price(x0+delta,y0)-goldstein_price(x0-delta,y0))/(2.0*delta);
+		println!("gs gx {} {}", g.borrow(), diff);
+		let gx = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff-gx).abs() <= delta);
 	}
+	else {
+		assert!(false);
+	};
+	let borrowed_y = y.borrow();
+	if let Some(ref g) = borrowed_y.ref_grad() {
+		let delta = 1.0e-6;
+		let diff = (goldstein_price(x0,y0+delta)-goldstein_price(x0,y0-delta))/(2.0*delta);
+		println!("gs gy {} {}", g.borrow(), diff);
+		let gy = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff-gy).abs() <= delta);
+	}
+	else {
+		assert!(false);
+	};
+
+	Ok(())
 }
 
 #[test]
 #[ignore]
-fn second_order_diff() {
+fn second_order_diff() -> Result<(),Box<dyn std::error::Error>> {
 	let mut nn = NeuralNetwork::<f64>::new();
 	let x0 = 2.0;
 	let x = nn.create_neuron("x", Tensor::<f64>::from_array(&[1,1],&[x0]));
@@ -410,45 +430,41 @@ fn second_order_diff() {
 	}
 	assert_eq!(y.borrow().ref_signal()[vec![0,0]],func(x0));
 
-	match nn.backward_propagating(0) {
-		Ok(outputs) => {
-			for output in outputs.iter() {
-				let delta = 1.0e-5;
-				let diff = (func(x0+delta)-func(x0-delta))/(2.0*delta);
-				println!("gx1 {}",output.borrow());
-				let gx = output.borrow().ref_signal()[vec![0,0]];
-				assert!((diff-gx).abs() <= delta);
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(0)?;
+	let gx = if let Some(ref gx) = x.borrow().ref_grad() {
+		Rc::clone(gx)
 	}
+	else {
+		return Err(Box::new(MyError::StringMsg("gx1 None".to_string())));
+	};
+
+	let delta = 1.0e-5;
+	let diff = differential(&func, x0, delta);
+	println!("gx1 {}",gx.borrow());
+	assert!((gx.borrow().ref_signal()[vec![0,0]] - diff).abs() < delta);
 
 	let _ = nn.clear_grads(0);
 	let _ = nn.clear_grads(1);
-
-	match nn.backward_propagating(1) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let delta = 1.0e-5;
-				let diff2 = (func(x0+delta) + func(x0-delta) - 2.0 * func(x0))/(delta.powf(2.0));
-				println!("gx2 {}",g.borrow());
-				let gx2 = g.borrow().ref_signal()[vec![0,0]];
-				assert!((diff2-gx2).abs() <= delta);
-			}
-			else {
-				assert!(false);
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(1)?;
+	let gx = if let Some(ref gx) = x.borrow().ref_grad() {
+		Rc::clone(gx)
 	}
-/*
+	else {
+		return Err(Box::new(MyError::StringMsg("gx2 None".to_string())));
+	};
+
+	let borrowed_x = x.borrow();
+	if let Some(ref g) = borrowed_x.ref_grad() {
+		let delta = 1.0e-5;
+		let diff2 = differential_2nd_order(&func, x0, delta);
+		println!("gx2 {}",g.borrow());
+		let gx2 = g.borrow().ref_signal()[vec![0,0]];
+		assert!((diff2-gx2).abs() <= delta);
+	}
+	else {
+		assert!(false);
+	};
+	/*
 				if let Err(e) = nn.make_dot_graph(0,"graph3_order0.dot") {
 					println!("{}",e);
 					assert!(false)
@@ -463,11 +479,12 @@ fn second_order_diff() {
 					println!("{}",e);
 					assert!(false)
 				}
-*/
+	 */
+	Ok(())
 }
 
 #[test]
-fn sin_taylor_expansion_test() {
+fn sin_taylor_expansion_test() -> Result<(),Box<dyn std::error::Error>> {
 	//Taylor Expansion of Sin
 	let mut nn = NeuralNetwork::<f64>::new();
 	let x0 = std::f64::consts::PI/2.0;
@@ -506,22 +523,16 @@ fn sin_taylor_expansion_test() {
 		assert!(diff < 1.0e-5);
 	}
 
-	match nn.backward_propagating(0) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let delta = 1.0e-5;
-				let diff = ((x0+delta).sin() - (x0-delta).sin())/(2.0*delta);
-				println!("gx {} {}",g.borrow(),diff);
-			}
-			else {
-				assert!(false);
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
-		}
+	nn.backward_propagating(0)?;
+
+	let borrowed_x = x.borrow();
+	if let Some(ref g) = borrowed_x.ref_grad() {
+		let delta = 1.0e-5;
+		let diff = ((x0+delta).sin() - (x0-delta).sin())/(2.0*delta);
+		println!("gx {} {}",g.borrow(),diff);
+	}
+	else {
+		assert!(false);
 	}
 
 	if let Err(e) = nn.make_dot_graph(0,"sin_taylor_order0.dot") {
@@ -531,9 +542,10 @@ fn sin_taylor_expansion_test() {
 
 	if let Err(e) = nn.make_dot_graph(1,"sin_taylor_order1.dot") {
 		println!("{}",e);
-		assert!(false)
+		assert!(false);
 	}
 
+	Ok(())
 }
 
 #[test]
@@ -611,21 +623,16 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 	{
 		let _ = nn.clear_grads(0);
 		let _ = nn.clear_grads(1);
-		match nn.backward_propagating(1) {
-			Ok(_outputs) => {
-				let borrowed_x = xs.borrow();
-				if let Some(ref _g) = borrowed_x.ref_grad() {
-					//println!("gx {}",g.borrow());
-				}
-				else {
-					return Err(Box::new(MyError::StringMsg("gx None".to_string())));
-				}
-			},
-			Err(e) => {
-				println!("{}",e);
-				assert!(false)
+		nn.backward_propagating(1)?;
+		{
+			let borrowed_x = xs.borrow();
+			if let Some(ref _g) = borrowed_x.ref_grad() {
+				//println!("gx {}",g.borrow());
 			}
-		};
+			else {
+				return Err(Box::new(MyError::StringMsg("gx None".to_string())));
+			}
+		}
 
 		let xs_holder = xs.borrow();
 		let raw_xs = xs_holder.ref_signal().buffer();
@@ -650,21 +657,15 @@ fn sin_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		let _ = nn.clear_grads(0);
 		let _ = nn.clear_grads(1);
 		let _ = nn.clear_grads(2);
-		match nn.backward_propagating(2) {
-			Ok(_outputs) => {
-				let borrowed_x = xs.borrow();
-				if let Some(ref _g) = borrowed_x.ref_grad() {
-					//println!("gx {}",g.borrow());
-				}
-				else {
-					return Err(Box::new(MyError::StringMsg("gx None".to_string())));
-				}
-			},
-			Err(e) => {
-				println!("{}",e);
-				assert!(false)
-			}
-		};
+		nn.backward_propagating(2)?;
+
+		let borrowed_x = xs.borrow();
+		if let Some(ref _g) = borrowed_x.ref_grad() {
+			//println!("gx {}",g.borrow());
+		}
+		else {
+			return Err(Box::new(MyError::StringMsg("gx None".to_string())));
+		}
 
 		let xs_holder = xs.borrow();
 		let raw_xs = xs_holder.ref_signal().buffer();
@@ -708,47 +709,37 @@ fn tanh_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 	println!("{} {}", 1.0f64.tanh(), y.borrow());
 	assert!(diff.abs() < 1.0e-5);
 
-	match nn.backward_propagating(0) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let gx = g.borrow().ref_signal()[vec![0,0]];
-				let delta = 1.0e-6;
-				let diff = ((1.0f64+delta).tanh()-(1.0f64-delta).tanh())/(2.0*delta);
-				assert!((diff - gx).abs() < delta);
-				println!("1st order diff {} {}",gx,diff);
-			}
-			else {
-				return Err(Box::new(MyError::StringMsg("gx None".to_string())));
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
+	nn.backward_propagating(0)?;
+	{
+		let borrowed_x = x.borrow();
+		if let Some(ref g) = borrowed_x.ref_grad() {
+			let gx = g.borrow().ref_signal()[vec![0,0]];
+			let delta = 1.0e-6;
+			let diff = ((1.0f64+delta).tanh()-(1.0f64-delta).tanh())/(2.0*delta);
+			assert!((diff - gx).abs() < delta);
+			println!("1st order diff {} {}",gx,diff);
 		}
-	};
+		else {
+			return Err(Box::new(MyError::StringMsg("gx None".to_string())));
+		}
+	}
 
 	let _ = nn.clear_grads(0);
 	let _ = nn.clear_grads(1);
-	match nn.backward_propagating(1) {
-		Ok(_outputs) => {
-			let borrowed_x = x.borrow();
-			if let Some(ref g) = borrowed_x.ref_grad() {
-				let gx = g.borrow().ref_signal()[vec![0,0]];
-				let delta = 1.0e-6;
-				let diff = ((1.0f64+delta).tanh()+(1.0f64-delta).tanh()-2.0*1.0f64.tanh())/delta.powf(2.0);
-				println!("second order {} {}",gx,diff);
-				//assert!((diff - gx).abs() < delta);
-			}
-			else {
-				return Err(Box::new(MyError::StringMsg("gx None".to_string())));
-			}
-		},
-		Err(e) => {
-			println!("{}",e);
-			assert!(false)
+	nn.backward_propagating(1)?;
+	{
+		let borrowed_x = x.borrow();
+		if let Some(ref g) = borrowed_x.ref_grad() {
+			let gx = g.borrow().ref_signal()[vec![0,0]];
+			let delta = 1.0e-6;
+			let diff = ((1.0f64+delta).tanh()+(1.0f64-delta).tanh()-2.0*1.0f64.tanh())/delta.powf(2.0);
+			println!("second order {} {}",gx,diff);
+			//assert!((diff - gx).abs() < delta);
 		}
-	};
+		else {
+			return Err(Box::new(MyError::StringMsg("gx None".to_string())));
+		}
+	}
 
 	if let Err(e) = nn.make_dot_graph(0,"tanh_taylor_order0.dot") {
 		println!("{}",e);
@@ -764,6 +755,7 @@ fn tanh_high_order_diff_test() -> Result<(),Box<dyn std::error::Error>> {
 		println!("{}",e);
 		assert!(false)
 	}
-	
+
 	Ok(())
 }
+
