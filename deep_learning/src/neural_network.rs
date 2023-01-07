@@ -68,7 +68,7 @@ where T:NeuronPrimType<T> {
 	fn forward(&mut self) -> Vec<NNNeuron<T>> {
 		for g in self.generation_table.iter() {
 			for node in g.iter() {
-				let outputs = node.borrow().forward();
+				let _ = node.borrow().forward();
 				/*
 				for output in outputs.iter() {
 					println!("{:p} {}", Rc::as_ptr(&output), output.borrow())
@@ -326,7 +326,7 @@ where T:NeuronPrimType<T> {
 		}
 	}
 
-	pub fn backward_propagating(&mut self, order:usize) -> Result<Vec<NNNeuron<T>>,String> {
+	pub fn backward_propagating(&mut self, order:usize) -> Result<(),String> {
 		if order < self.cg_order.len() {
 			let cg = self.cg_order[order].backward();
 			if self.cg_order.len() <= order+1 {
@@ -336,9 +336,9 @@ where T:NeuronPrimType<T> {
 				self.cg_order[order+1] = cg;
 			}
 
-			let outputs = self.cg_order[order+1].forward();
+			self.cg_order[order+1].forward();
 
-			Ok(outputs)
+			Ok(())
 		}
 		else {
 			Err("invalid order".to_string())
