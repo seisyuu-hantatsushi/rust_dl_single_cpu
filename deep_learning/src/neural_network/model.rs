@@ -15,7 +15,7 @@ use rand_pcg::Pcg64;
 
 use linear_transform::tensor::Tensor;
 use crate::neural_network::NeuralNetwork;
-use crate::neural_network_layer::NNLayer;
+use crate::neural_network::layer::NNLayer;
 use crate::neuron::{NeuronPrimType,Neuron,NNNeuron};
 use crate::synapse::{NNSynapseNode,SynapseNode};
 
