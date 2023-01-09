@@ -12,7 +12,7 @@ use crate::synapse::{NNSynapseNode,SynapseNode};
 struct ComputationalGraph<T>
 where T: NeuronPrimType<T> {
 	neurons: HashMap<* const RefCell<Neuron<T>>, NNNeuron<T>>,
-	synapse_nodes: HashMap<* const RefCell<SynapseNode<T>>, Rc<RefCell<SynapseNode<T>>>>,
+	synapse_nodes: HashMap<* const RefCell<SynapseNode<T>>, NNSynapseNode<T>>,
 	generation_table: Vec<Vec<NNSynapseNode<T>>>
 }
 
@@ -106,6 +106,7 @@ where T:NeuronPrimType<T> {
 		for nn in self.neurons.values() {
 			nn.borrow_mut().clear_grad()
 		}
+		self.erase_isolation_neuron();
 	}
 
 	pub fn make_dot_graph(&mut self, file_name:&str, disp_generation:bool) -> () {
@@ -353,6 +354,22 @@ where T:NeuronPrimType<T> {
 		else {
 			Err("invalid order".to_string())
 		}
+	}
+
+	pub fn get_linked_synapses(&mut self, order:usize, nn:&NNNeuron<T>) -> Vec<NNSynapseNode<T>> {
+		let sns = if order < self.cg_order.len() {
+			let mut sns = vec!();
+			for sn in self.cg_order[order].synapse_nodes.values() {
+				if sn.borrow().is_linked(nn) {
+					sns.push(Rc::clone(sn))
+				}
+			}
+			sns
+		}
+		else {
+			vec!()
+		};
+		sns
 	}
 
 	pub fn make_dot_graph(&mut self, order:usize, file_name:&str) -> Result<(),String> {

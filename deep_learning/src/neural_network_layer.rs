@@ -50,8 +50,7 @@ where T:NeuronPrimType<T> {
 		)
 	}
 
-	pub fn layer_set_inputs(&mut self, layer:&NNLayer<T>, inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
-
+	pub fn layer_set_inputs(&mut self, layer:&mut NNLayer<T>, inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
 		match layer {
 			NNLayer::<T>::Linear(l) => {
 				let mut ns = vec!();
@@ -100,7 +99,7 @@ where T:NeuronPrimType<T> {
 
 impl<T> NNLayer<T>
 where T:NeuronPrimType<T> {
-	pub fn get_layer_param(&self) -> Vec<NNNeuron<T>> {
+	pub fn get_params(&self) -> Vec<NNNeuron<T>> {
 		match self {
 			NNLayer::<T>::Linear(l) => {
 				let mut ns:Vec<NNNeuron<T>> = vec!();

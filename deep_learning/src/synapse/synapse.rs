@@ -473,4 +473,34 @@ where T:NeuronPrimType<T> {
 		(self.synapse.make_diff_node)(&self.inputs, &grads, self.synapse.ref_option())
     }
 
+	pub fn is_linked(&self, nn:&NNNeuron<T>) -> bool {
+		for ni in self.inputs.iter() {
+			if Rc::as_ptr(ni) == Rc::as_ptr(nn) {
+				return true;
+			}
+		}
+		for no in self.outputs.iter() {
+			if Rc::as_ptr(no) == Rc::as_ptr(nn) {
+				return true;
+			}
+		}
+		false
+	}
+
+	pub fn input_neurons(&self) -> Vec<NNNeuron<T>> {
+		let mut nis = vec!();
+		for ni in self.inputs.iter() {
+			nis.push(Rc::clone(ni))
+		}
+		nis
+	}
+
+	pub fn output_neurons(&self) -> Vec<NNNeuron<T>> {
+		let mut nos = vec!();
+		for no in self.outputs.iter() {
+			nos.push(Rc::clone(no))
+		}
+		nos
+	}
+
 }
