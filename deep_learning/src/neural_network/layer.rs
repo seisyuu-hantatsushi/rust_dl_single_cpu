@@ -24,10 +24,12 @@ where T: NeuronPrimType<T> {
 
 pub type NNLinear<T> = RefCell<Linear<T>>;
 
-pub enum NNLayer<T>
+pub enum Layer<T>
 where T: NeuronPrimType<T> {
     Linear(NNLinear<T>)
 }
+
+pub type NNLayer<T> = Rc<Layer<T>>;
 
 impl<T> NeuralNetwork<T>
 where T:NeuronPrimType<T> {
@@ -36,23 +38,23 @@ where T:NeuronPrimType<T> {
 							   name: &str,
 							   out_size:usize,
 							   enable_bias:bool) -> NNLayer<T> {
-		NNLayer::Linear(
-			RefCell::new(
-				Linear {
-					name: name.to_string(),
-					enable_bias: enable_bias,
-					out_size: out_size,
-					w: None,
-					b: None,
-					output: None
-				}
-			)
-		)
+		let linear = Linear {
+			name: name.to_string(),
+			enable_bias: enable_bias,
+			out_size: out_size,
+			w: None,
+			b: None,
+			output: None
+		};
+
+		let layer = Layer::Linear(RefCell::new(linear));
+		Rc::new(layer)
 	}
 
-	pub fn layer_set_inputs(&mut self, layer:&mut NNLayer<T>, inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+	pub fn layer_set_inputs(&mut self, nnlayer:&mut NNLayer<T>, inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+		let layer = Rc::get_mut(nnlayer).unwrap_or_else(|| panic!("not safe to mutate"));
 		match layer {
-			NNLayer::<T>::Linear(l) => {
+			Layer::<T>::Linear(l) => {
 				let mut ns = vec!();
 				let mut borrowed_l = l.borrow_mut();
 				if let None = borrowed_l.w {
@@ -97,11 +99,11 @@ where T:NeuronPrimType<T> {
 	}
 }
 
-impl<T> NNLayer<T>
+impl<T> Layer<T>
 where T:NeuronPrimType<T> {
 	pub fn get_params(&self) -> Vec<NNNeuron<T>> {
 		match self {
-			NNLayer::<T>::Linear(l) => {
+			Layer::<T>::Linear(l) => {
 				let mut ns:Vec<NNNeuron<T>> = vec!();
 				let borrowed_l = l.borrow();
 				if let Some(ref w) = borrowed_l.w {

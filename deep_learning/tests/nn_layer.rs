@@ -10,7 +10,7 @@ use rand_pcg::Pcg64;
 
 use linear_transform::Tensor;
 use deep_learning::neural_network::NeuralNetwork;
-use deep_learning::neural_network_model::MLPActivator;
+use deep_learning::neural_network::model::MLPActivator;
 
 use plotters::prelude::full_palette::*;
 use plotters::prelude::{Circle,BitMapBackend,LineSeries,ChartBuilder,PathElement,SeriesLabelPosition};

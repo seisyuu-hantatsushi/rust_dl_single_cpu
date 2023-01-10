@@ -6,14 +6,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::HashMap;
 
-/*
-use rand::prelude::*;
-use rand::SeedableRng;
-use rand_distr::{Normal,Distribution};
-use rand_pcg::Pcg64;
- */
-
-use linear_transform::tensor::Tensor;
 use crate::neural_network::NeuralNetwork;
 use crate::neural_network::layer::NNLayer;
 use crate::neuron::{NeuronPrimType,Neuron,NNNeuron};
@@ -40,7 +32,7 @@ where T: NeuronPrimType<T> {
 
 pub type NNMLP<T> = RefCell<MLP<T>>;
 
-pub enum Model<T>
+pub enum EModel<T>
 where T: NeuronPrimType<T> {
 	TwoLayerNet(NNTwoLayerNet<T>),
 	MLP(NNMLP<T>)
@@ -48,11 +40,13 @@ where T: NeuronPrimType<T> {
 
 type NNSynapseNodeHashMap<T> = HashMap<* const RefCell<SynapseNode<T>>, Rc<RefCell<SynapseNode<T>>>>;
 
-pub struct NNModel<T>
+pub struct Model<T>
 where T: NeuronPrimType<T> {
 	synapse_nodes: NNSynapseNodeHashMap<T>,
-	model: Model<T>
+	model: EModel<T>
 }
+
+pub type NNModel<T> = Rc<Model<T>>;
 
 impl<T> NeuralNetwork<T>
 where T:NeuronPrimType<T> {
@@ -67,14 +61,14 @@ where T:NeuronPrimType<T> {
 		let ll2 = self.create_linear_layer(&(name.to_string()+"_LL2"),
 										   out_size,
 										   true);
-		NNModel {
+		Rc::new(Model {
 			synapse_nodes: HashMap::new(),
-			model: Model::TwoLayerNet(
+			model: EModel::TwoLayerNet(
 				RefCell::new(TwoLayerNet {
 					ll1: ll1,
 					ll2: ll2
 				}))
-		}
+		})
 	}
 
 	pub fn create_mlp_model(&mut self,
@@ -87,14 +81,13 @@ where T:NeuronPrimType<T> {
 			self.create_linear_layer(&label, out_sizes[i], true)
 		}).collect();
 
-		NNModel {
+		Rc::new(Model {
 			synapse_nodes: HashMap::new(),
-			model: Model::MLP(
+			model: EModel::MLP(
 				RefCell::new(MLP {
 					lls:lls,
 					activator: activator
-				}))
-		}
+				}))})
 	}
 
 	fn two_layer_net_set_inputs(&mut self,
@@ -145,13 +138,14 @@ where T:NeuronPrimType<T> {
 	}
 
 	pub fn model_set_inputs(&mut self,
-							model:&mut NNModel<T>,
+							nnmodel:&mut NNModel<T>,
 							inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+		let model = Rc::get_mut(nnmodel).unwrap_or_else(|| panic!("not safe to mutate"));
 		match &model.model {
-			Model::TwoLayerNet(m) => {
+			EModel::TwoLayerNet(m) => {
 				self.two_layer_net_set_inputs(&mut model.synapse_nodes, &mut m.borrow_mut(), inputs)
 			},
-			Model::MLP(m) => {
+			EModel::MLP(m) => {
 				self.mlp_set_inputs(&mut model.synapse_nodes, &mut m.borrow_mut(), inputs)
 			}
 		}
@@ -159,15 +153,15 @@ where T:NeuronPrimType<T> {
 
 }
 
-impl<T> NNModel<T>
+impl<T> Model<T>
 where T:NeuronPrimType<T> {
 
 	pub fn get_params(&self) -> Vec<NNNeuron<T>> {
 		match &self.model {
-			Model::TwoLayerNet(m) => {
+			EModel::TwoLayerNet(m) => {
 				vec![m.borrow().ll1.get_params(),m.borrow().ll2.get_params()].concat()
 			},
-			Model::MLP(m) => {
+			EModel::MLP(m) => {
 				m.borrow().lls.iter().map(|ll| ll.get_params()).collect::<Vec<Vec<NNNeuron<T>>>>().concat()
 			}
 		}
