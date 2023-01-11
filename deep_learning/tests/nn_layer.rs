@@ -19,16 +19,16 @@ use plotters::style::{IntoFont,Color};
 
 #[derive(Debug)]
 enum MyError {
-    StringMsg(String)
+	StringMsg(String)
 }
 
 impl Display for MyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-	use self::MyError::*;
-	match self {
-	    StringMsg(s) => write!(f, "{}", s)
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		use self::MyError::*;
+		match self {
+			StringMsg(s) => write!(f, "{}", s)
+		}
 	}
-    }
 }
 
 impl Error for MyError {}
