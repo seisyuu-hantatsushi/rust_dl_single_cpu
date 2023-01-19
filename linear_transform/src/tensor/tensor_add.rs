@@ -1,7 +1,7 @@
 use std::{ops};
 use num;
 
-use crate::tensor::tensor_base::{Tensor};
+use crate::tensor::tensor_base::{Tensor,SubTensor};
 
 /* T = T + T */
 impl<T> ops::Add for Tensor<T>
@@ -60,15 +60,19 @@ impl<T> ops::Add for &Tensor<T>
     }
 }
 
-#[test]
-fn tensor_add_test(){
-    let shape:[usize;2] = [3,4];
-    let t0 = Tensor::<f32>::zero(&shape);
-    let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
-			    21.0,22.0,23.0,24.0,
-			    31.0,32.0,33.0,34.0 ];
-    let t1 = Tensor::<f32>::from_array(&[3,4],&m_init);
+impl<T> Tensor<T>
+where T:num::Num + Copy + std::fmt::Display{
 
-    let t2 = t1 + t0;
-    println!("{}", t2);
+    pub fn add_at(&self, pos:&[usize], x:&Tensor<T>) -> Tensor<T> {
+	assert!(pos.len() > 0);
+	let st = self.get_sub_tensor_by_position(pos).unwrap_or_else(|| panic!("invalid position"));
+	let start_pos = self.position_to_index(pos).unwrap_or_else(|| panic!("invalid position"));
+	let mut v = self.buffer().to_vec();
+	let xv = x.buffer();
+	for i in 0..st.num_of_elements() {
+	    v[start_pos+i] = v[start_pos+i]+xv[i]
+	}
+	Tensor::from_vector(self.shape().to_vec(), v)
+   }
 }
+

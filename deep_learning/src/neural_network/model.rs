@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use crate::neural_network::NeuralNetwork;
 use crate::neural_network::layer::NNLayer;
 use crate::neuron::{NeuronPrimType,Neuron,NNNeuron};
-use crate::synapse::{NNSynapseNode,SynapseNode};
+use crate::synapse::SynapseNode;
 
 pub struct TwoLayerNet<T>
 where T: NeuronPrimType<T> {

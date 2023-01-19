@@ -61,7 +61,8 @@ where T: fmt::Display + Clone {
     }
 }
 
-impl<T:Clone> Tensor<T> {
+impl<T> Tensor<T>
+	where T:Clone {
 
     pub fn shape(&self) -> &[usize] {
 		self.shape.as_slice()
@@ -93,6 +94,39 @@ impl<T:Clone> Tensor<T> {
 			vec!()
 		}
     }
+
+	pub fn position_to_index_inner(index:usize,
+								   src_shape:&[usize],
+								   position:&[usize]) -> Option<usize> {
+
+		if position.len() == 0 {
+			return Some(index);
+		}
+
+		if !(position[0] < src_shape[0]) {
+			return None;
+		}
+
+		if src_shape.len() == 1 {
+			return Some(index + position[0])
+		}
+
+		let block_size = src_shape[1..].iter().fold(1,|p, &i| p*i);
+		Self::position_to_index_inner(index+block_size*position[0],
+									  &src_shape[1..],
+									  &position[1..])
+	}
+
+	pub fn position_to_index(&self, position:&[usize]) -> Option<usize> {
+		if position.len() == 0 {
+			return None;
+		}
+		if !(position.len() <= self.shape().len()) {
+			return None;
+		}
+		Self::position_to_index_inner(0, self.shape(), position)
+	}
+
 }
 
 impl<T:Clone> Tensor<T> {
@@ -115,7 +149,7 @@ fn element<'a, T>(index:&[usize], shape:&'a [usize], v:&'a [T]) -> &'a T {
 		let stride = down_shape.iter().fold(1,|prod,x| prod * (*x));
 		let i = index[0];
 		element(&index[1..], &down_shape, &v[(stride*i)..(stride*(i+1))])
-}
+	}
     else {
 		&v[index[0]]
     }
@@ -208,15 +242,97 @@ where T:num::Num+Clone+Copy {
 impl<T> Tensor<T>
 where T:Clone {
     pub fn sub_tensor<'a>(&'a self, index:usize) -> SubTensor<'a, T> {
-	assert!(self.shape.len() > 0);
-	assert!(index < self.shape[0]);
+		assert!(self.shape.len() > 1);
+		if self.shape[0] == 1 {
+			assert!(index < self.shape[1])
+		}
+		else {
+			assert!(index < self.shape[0])
+		}
+
 		let down_shape = self.shape[1..self.shape.len()].to_vec();
-		let stride = down_shape.iter().fold(1, |prod, x| prod * (*x));
+		let stride = if self.shape[0] == 1 {
+			1
+		}
+		else {
+			down_shape.iter().fold(1, |prod, x| prod * (*x))
+		};
+		let down_shape = if self.shape[0] == 1 {
+			vec![1,1]
+		}
+		else if down_shape.len() == 1 {
+			vec![1, down_shape[0]]
+		}
+		else {
+			down_shape
+		};
 		SubTensor {
 			shape: down_shape,
 			v: &self.v[(stride*index)..(stride*(index+1))]
 		}
     }
+
+	pub fn get_sub_tensor_by_position<'a>(&'a self, position:&[usize])
+										  -> Option<SubTensor<'a, T>> {
+		if self.shape.len() < position.len() {
+			return None;
+		}
+
+		let index = if let Some(index) = self.position_to_index(position) {
+			index
+		}
+		else {
+			return None;
+		};
+
+		let blocksize = self.shape[position.len()..].iter().fold(1,|p, &i| p*i);
+		let down_shape = &self.shape[position.len()..];
+		let down_shape = if down_shape.len() == 0 {
+			vec![1,1]
+		}
+		else if down_shape.len() == 1{
+			vec![1, down_shape[0]]
+		}
+		else {
+			down_shape.to_vec()
+		};
+
+		Some(SubTensor {
+			shape: down_shape,
+			v: &self.v[index..(index+blocksize)]
+		})
+	}
+
+	pub fn sub_tensor_mut<'a>(&'a mut self, index:usize) -> SubTensor<'a, T> {
+		assert!(self.shape.len() > 1);
+		if self.shape[0] == 1 {
+			assert!(index < self.shape[1])
+		}
+		else {
+			assert!(index < self.shape[0])
+		}
+
+		let down_shape = self.shape[1..self.shape.len()].to_vec();
+		let stride = if self.shape[0] == 1 {
+			1
+		}
+		else {
+			down_shape.iter().fold(1, |prod, x| prod * (*x))
+		};
+		let down_shape = if self.shape[0] == 1 {
+			vec![1,1]
+		}
+		else if down_shape.len() == 1 {
+			vec![1, down_shape[0]]
+		}
+		else {
+			down_shape
+		};
+		SubTensor {
+			shape: down_shape,
+			v: &self.v[(stride*index)..(stride*(index+1))]
+		}
+	}
 }
 
 impl<T> ops::Index<Vec<usize>> for Tensor<T>
@@ -236,9 +352,24 @@ where T:Clone {
     }
 }
 
+impl<T> ops::Index<usize> for Tensor<T>
+where T:Clone {
+	type Output = T;
+	fn index(&self, index:usize) -> &Self::Output {
+		&self.v[index]
+	}
+}
+
+impl<T> ops::IndexMut<usize> for Tensor<T>
+where T:Clone {
+	fn index_mut(&mut self, index:usize) -> &mut T {
+		&mut self.v[index]
+	}
+}
+
 impl <T> Tensor<T>
 where T: num::Num+std::cmp::PartialOrd+Clone+Copy+fmt::Debug {
-    fn search_max_element(shape:Vec<usize>, v:&[T]) -> (Vec<usize>,T) {
+	fn search_max_element(shape:Vec<usize>, v:&[T]) -> (Vec<usize>,T) {
 		if shape.len() > 1 {
 			let mut holder:Vec<(Vec<usize>, T)> = Vec::new();
 	    for n in 0..shape[0] {
@@ -277,13 +408,6 @@ where T: num::Num+std::cmp::PartialOrd+Clone+Copy+fmt::Debug {
     }
 }
 
-impl<'a, T> SubTensor<'a,T>
-where T:Clone{
-    pub fn shape(&self) -> &[usize] {
-		self.shape.as_slice()
-    }
-}
-
 impl<'a, T> fmt::Display for SubTensor<'a,T>
 where T:fmt::Display + Clone  {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -298,13 +422,52 @@ where T:fmt::Display + Clone  {
     }
 }
 
+impl<'a,T: PartialEq+Clone> PartialEq for SubTensor<'a,T> {
+    fn eq(&self, other: &Self) -> bool {
+		self.shape() == other.shape() && self.v == other.v
+    }
+}
+
+impl<'a,T: PartialEq+Clone> Eq for SubTensor<'a,T> { }
+
+impl<'a, T> SubTensor<'a,T>
+where T:Clone{
+    pub fn shape(&self) -> &[usize] {
+		self.shape.as_slice()
+    }
+}
+
 impl<'a, T> SubTensor<'a, T>
 where T:Clone {
+
     pub fn sub_tensor(&'a self, index:usize) -> SubTensor<'a, T> {
 		assert!(self.shape.len() > 0);
-		assert!(index < self.shape[0]);
+
+		assert!(self.shape.len() > 1);
+		if self.shape[0] == 1 {
+			assert!(index < self.shape[1])
+		}
+		else {
+			assert!(index < self.shape[0])
+		}
+
 		let down_shape = self.shape[1..self.shape.len()].to_vec();
-		let stride = down_shape.iter().fold(1, |prod, x| prod * (*x));
+		let stride = if self.shape[0] == 1 {
+			1
+		}
+		else {
+			down_shape.iter().fold(1, |prod, x| prod * (*x))
+		};
+		let down_shape = if self.shape[0] == 1 {
+			vec![1,1]
+		}
+		else if down_shape.len() == 1 {
+			vec![1, down_shape[0]]
+		}
+		else {
+			down_shape
+		};
+
 		SubTensor {
 			shape: down_shape,
 			v: &self.v[(stride*index)..(stride*(index+1))]
@@ -321,5 +484,38 @@ where T:Clone {
     pub fn buffer(&self) -> &[T] {
 		&self.v
     }
+
+	pub fn num_of_elements(&self) -> usize {
+		self.v.len()
+	}
+
+	pub fn get_sub_tensor(st: SubTensor<'a, T>, index:usize) -> SubTensor<'a, T> {
+		assert!(st.shape.len() > 0);
+		assert!(index < st.shape[0]);
+		let down_shape = st.shape[1..st.shape.len()].to_vec();
+		let stride = down_shape.iter().fold(1, |prod, x| prod * (*x));
+		SubTensor {
+			shape: down_shape,
+			v: &st.v[(stride*index)..(stride*(index+1))]
+		}
+	}
 }
 
+impl<'a, T> ops::Index<Vec<usize>> for SubTensor<'a, T>
+where T:Clone {
+    type Output = T;
+    fn index(&self, index:Vec<usize>) -> &Self::Output {
+		assert!(index.len() == self.shape.len());
+		element(&index,&self.shape, &self.v)
+    }
+}
+
+/*
+impl<'a, T> ops::IndexMut<Vec<usize>> for SubTensor<'a, T>
+where T:Clone {
+    fn index_mut(&mut self, index:Vec<usize>) -> &mut T {
+		assert!(index.len() == self.shape.len());
+		element_mut(&index, &self.shape, &mut self.v)
+    }
+}
+*/

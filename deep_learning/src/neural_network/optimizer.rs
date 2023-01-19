@@ -1,12 +1,11 @@
 /* -*- tab-width:4 -*- */
 
-use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use linear_transform::Tensor;
 use crate::neural_network::NNModel;
-use crate::neuron::{NeuronPrimType,Neuron,NNNeuron};
+use crate::neuron::{NeuronPrimType,Neuron};
 
 #[derive(Clone)]
 pub struct SGD<T>

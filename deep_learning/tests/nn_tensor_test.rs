@@ -630,3 +630,39 @@ fn mean_square_error_test() -> Result<(),Box<dyn std::error::Error>> {
 	}
 	Ok(())
 }
+
+#[test]
+fn slice_test() -> Result<(),Box<dyn std::error::Error>> {
+
+	let t0:Vec<f64> = vec![ 1.0, 2.0, 3.0 ];
+	let t1:Vec<f64> = vec![ 4.0, 5.0, 6.0 ];
+	let t2:Vec<f64> = vec![ 7.0, 8.0, 9.0 ];
+	let t = vec![t0.clone(),t1.clone(),t2.clone()].concat();
+	let src_tensor = Tensor::<f64>::from_vector(vec![3,3], t);
+
+	{
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x0 = nn.create_neuron("x0", src_tensor);
+
+		let y1 = nn.slice(Rc::clone(&x0), 1);
+		let y2 = nn.slice(x0, 2);
+		println!("{}", y1.borrow());
+		assert_eq!(y1.borrow().ref_signal().buffer(), t1);
+		println!("{}", y2.borrow());
+		assert_eq!(y2.borrow().ref_signal().buffer(), t2);
+	}
+
+	{
+		let mut nn = NeuralNetwork::<f64>::new();
+		let x0 = nn.create_neuron("x0", src_tensor);
+		let y2 = nn.slice(x0, 2);
+		println!("{}", y2.borrow());
+		assert_eq!(y1.borrow().ref_signal().buffer(), t1);
+
+		
+	}
+	
+
+	
+	Ok(())
+}

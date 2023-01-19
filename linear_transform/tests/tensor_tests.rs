@@ -122,3 +122,115 @@ fn tensor_index_test () {
 
     assert_eq!(x[index.clone()], 2.0);
 }
+
+#[test]
+fn tensor_add_test(){
+    let shape:[usize;2] = [3,4];
+    let t0 = Tensor::<f32>::zero(&shape);
+    let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
+			    21.0,22.0,23.0,24.0,
+			    31.0,32.0,33.0,34.0 ];
+    let t1 = Tensor::<f32>::from_array(&[3,4],&m_init);
+
+    let t2 = t1 + t0;
+    println!("{}", t2);
+}
+
+#[test]
+fn subtensor_test() {
+    {
+	let v = (0..5*6*4).map(|i| i as f64).collect::<Vec<f64>>();
+	let t0 = Tensor::<f64>::from_vector(vec![5,6,4], v);
+	let st2 = t0.sub_tensor(2);
+	println!("{}", t0);
+	println!("{}", st2);
+
+	if let Some(u) = t0.position_to_index(&[4,3]){
+	    assert_eq!(u,108);
+	}
+	else {
+	    panic!("test failed. {}:{}", file!(), line!());
+	}
+
+	assert_eq!(None, t0.position_to_index(&[4,10]));
+
+	if let Some(u) = t0.position_to_index(&[0,0,0]) {
+	    assert_eq!(u,0);
+	}
+	else {
+	    panic!("test failed. {}:{}", file!(), line!());
+	}
+
+	if let Some(u) = t0.position_to_index(&[1,1,1]) {
+	    assert_eq!(u,29);
+	}
+	else {
+	    panic!("test failed. {}:{}", file!(), line!());
+	}
+
+	if let Some(u) = t0.position_to_index(&[4]) {
+	    assert_eq!(u,96);
+	}
+	else {
+	    panic!("test failed. {}:{}", file!(), line!());
+	}
+    }
+
+    {
+	let v = (0..5*6*4*8).map(|i| i as f64).collect::<Vec<f64>>();
+	let t0 = Tensor::<f64>::from_vector(vec![5,6,4,8], v);
+	println!("{}", t0);
+
+	if let Some(st) = t0.get_sub_tensor_by_position(&[2]){
+	    assert_eq!(st, t0.sub_tensor(2));
+	}
+	else {
+	    panic!("test failed. {}:{}", file!(), line!());
+	};
+
+	if None != t0.get_sub_tensor_by_position(&[4,7]) {
+	    panic!("test failed. {}:{}", file!(), line!());
+	}
+
+	if let Some(st) = t0.get_sub_tensor_by_position(&[2,3]){
+	    let st2 = t0.sub_tensor(2).into_tensor();
+	    let st23 = st2.sub_tensor(3);
+	    assert_eq!(st,st23);
+	}
+
+	if let Some(st) = t0.get_sub_tensor_by_position(&[1,3,2]){
+	    println!("{}",st);
+	    let st1 = t0.sub_tensor(1).into_tensor();
+	    let st13 = st1.sub_tensor(3).into_tensor();
+	    let st132 = st13.sub_tensor(2);
+	    assert_eq!(st,st132);
+	}
+
+	if let Some(st) = t0.get_sub_tensor_by_position(&[1,3,2,6]){
+	    println!("{}",st);
+	    let st1 = t0.sub_tensor(1).into_tensor();
+	    let st13 = st1.sub_tensor(3).into_tensor();
+	    let st132 = st13.sub_tensor(2).into_tensor();
+	    let st1326 = st132.sub_tensor(6);
+	    assert_eq!(st,st1326);
+	}
+    }
+
+}
+
+#[test]
+fn add_at_test () {
+    {
+	let v0 = (0..6*3*7*4).map(|i| i as f64).collect::<Vec<f64>>();
+	let t0 = Tensor::<f64>::from_vector(vec![6,3,7,4], v0);
+	let t1 = Tensor::<f64>::from_vector(vec![1,4], vec![1.0f64;4]);
+	let t2 = t0.add_at(&[5,2,4], &t1);
+
+	let mut t3 = Tensor::<f64>::from_vector(vec![6,3,7,4], vec![0.0f64;6*3*7*4]);
+	t3[vec![5,2,4,0]] = 1.0;
+	t3[vec![5,2,4,1]] = 1.0;
+	t3[vec![5,2,4,2]] = 1.0;
+	t3[vec![5,2,4,3]] = 1.0;
+	assert_eq!(t2,t3+t0);
+    }
+}
