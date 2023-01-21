@@ -11,8 +11,8 @@ where T:NeuronPrimType<T> {
 	BroadcastTo((Vec<usize>,Vec<usize>)),
 	Reshape((Vec<usize>,Vec<usize>)),
 	Sum((Vec<usize>,Vec<usize>)),
-	Slice(usize),
-	SliceGrad((usize, Vec<usize>)),
+	Slice((usize, Vec<usize>)),
+	SliceGrad(usize),
 	Scale(T)
 }
 

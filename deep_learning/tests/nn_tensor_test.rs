@@ -642,27 +642,81 @@ fn slice_test() -> Result<(),Box<dyn std::error::Error>> {
 
 	{
 		let mut nn = NeuralNetwork::<f64>::new();
-		let x0 = nn.create_neuron("x0", src_tensor);
+		let x0 = nn.create_neuron("x0", src_tensor.clone());
 
 		let y1 = nn.slice(Rc::clone(&x0), 1);
-		let y2 = nn.slice(x0, 2);
 		println!("{}", y1.borrow());
 		assert_eq!(y1.borrow().ref_signal().buffer(), t1);
-		println!("{}", y2.borrow());
-		assert_eq!(y2.borrow().ref_signal().buffer(), t2);
+
+		nn.backward_propagating(0)?;
+		{
+			let borrowed_x0 = x0.borrow();
+			if let Some(ref gx0) = borrowed_x0.ref_grad() {
+				println!("{}",gx0.borrow());
+			}
+			else {
+				return Err(Box::new(MyError::StringMsg("no grad".to_string())));
+			}
+		}
+
+		nn.clear_grads(0)?;
+		nn.clear_grads(1)?;
+		nn.backward_propagating(1)?;
+
+		{
+			let borrowed_x0 = x0.borrow();
+			if let Some(ref gx0) = borrowed_x0.ref_grad() {
+				println!("{}",gx0.borrow());
+			}
+			else {
+				return Err(Box::new(MyError::StringMsg("no grad".to_string())));
+			}
+		}
 	}
 
 	{
 		let mut nn = NeuralNetwork::<f64>::new();
 		let x0 = nn.create_neuron("x0", src_tensor);
-		let y2 = nn.slice(x0, 2);
+		let y1 = nn.slice(Rc::clone(&x0), 1);
+		let y2 = nn.slice(Rc::clone(&x0), 2);
 		println!("{}", y2.borrow());
 		assert_eq!(y1.borrow().ref_signal().buffer(), t1);
+		assert_eq!(y2.borrow().ref_signal().buffer(), t2);
 
-		
+		nn.backward_propagating(0)?;
+		{
+			let borrowed_x0 = x0.borrow();
+			if let Some(ref gx0) = borrowed_x0.ref_grad() {
+				println!("{}",gx0.borrow());
+			}
+			else {
+				return Err(Box::new(MyError::StringMsg("no grad".to_string())));
+			}
+		}
+
+		nn.clear_grads(0)?;
+		nn.clear_grads(1)?;
+		nn.backward_propagating(1)?;
+
+		if let Err(e) = nn.make_dot_graph(0,"cg_slice_order0.dot") {
+			println!("{}",e);
+			assert!(false)
+		}
+
+		if let Err(e) = nn.make_dot_graph(1,"cg_slice_order1.dot") {
+			println!("{}",e);
+			assert!(false)
+		}
+
+		{
+			let borrowed_x0 = x0.borrow();
+			if let Some(ref gx0) = borrowed_x0.ref_grad() {
+				println!("{}",gx0.borrow());
+			}
+			else {
+				return Err(Box::new(MyError::StringMsg("no grad".to_string())));
+			}
+		}
 	}
-	
-
-	
 	Ok(())
 }

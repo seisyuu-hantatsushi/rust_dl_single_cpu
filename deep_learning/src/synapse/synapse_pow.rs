@@ -193,7 +193,5 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 		output.borrow_mut().set_generator(Rc::clone(&rs));
 		rs.borrow().forward();
 		(rs, output)
-
 	}
-	
 }

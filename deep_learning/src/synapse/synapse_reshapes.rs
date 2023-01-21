@@ -258,9 +258,9 @@ where T:NeuronPrimType<T> {
 
 	fn slice_forward(inputs: Vec<&Tensor<T>>, opt: &Option<SynapseOption<T>>)
 					 -> Vec<Tensor<T>> {
-		let index = if let Some(o) = opt {
+		let &index = if let Some(o) = opt {
 			match o {
-				SynapseOption::Slice(index) => *index,
+				SynapseOption::Slice((index, _)) => index,
 				_ => panic!("invalid option")
 			}
 		}
@@ -277,13 +277,10 @@ where T:NeuronPrimType<T> {
 					  -> (Vec<NNSynapseNode<T>>, Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
-		let borrowed_input = inputs[0].borrow();
-		let src_shape = borrowed_input.ref_signal().shape();
-		let &index = if let Some(ref o) = opt {
+
+		let (index, src_shape) = if let Some(ref o) = opt {
 			match o {
-				SynapseOption::Slice(index) => {
-					index
-				},
+				SynapseOption::Slice(s) => s,
 				_ => panic!("invalid option")
 			}
 		}
@@ -291,10 +288,12 @@ where T:NeuronPrimType<T> {
 			panic!("no option")
 		};
 
-		if !borrowed_input.is_constant() {
-			let (sn, output) = Self::slice_grad(Rc::clone(&grads[0]),
-												src_shape.to_vec(),
-												index);
+		if !inputs[0].borrow().is_constant() {
+			let (sn, output) = Self::slice_grad(Rc::clone(&inputs[0]),
+												Rc::clone(&grads[0]),
+												*index);
+			outputs.push(Rc::clone(&inputs[0]));
+			outputs.push(Rc::clone(&grads[0]));
 			sns.push(sn);
 			outputs.push(Rc::clone(&output));
 			let mut n = inputs[0].borrow_mut();
@@ -315,7 +314,7 @@ where T:NeuronPrimType<T> {
 	pub fn slice(x:NNNeuron<T>, index:usize) -> (NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "slice";
 		let output = nn_neuron_new(&label, Tensor::<T>::zero(&[1,1]));
-		let opt = SynapseOption::Slice(index);
+		let opt = SynapseOption::Slice((index, x.borrow().shape().to_vec()));
 		let s = Synapse::<T>::new_with_option(Self::slice_forward,
 											  Self::slice_backward,
 											  opt);
@@ -331,10 +330,10 @@ where T:NeuronPrimType<T> {
 
 	fn slice_grad_forward(inputs: Vec<&Tensor<T>>, opt: &Option<SynapseOption<T>>)
 						  -> Vec<Tensor<T>> {
-		let (&index, src_shape) = if let Some(ref o) = opt {
+		let &index = if let Some(ref o) = opt {
 			match o {
-				SynapseOption::SliceGrad((index, src_shape)) => {
-					(index, src_shape)
+				SynapseOption::SliceGrad(index) => {
+					index
 				},
 				_ => panic!("invalid option")
 			}
@@ -342,8 +341,8 @@ where T:NeuronPrimType<T> {
 		else {
 			panic!("no option")
 		};
-		let dst_tensor = Tensor::<T>::zero(src_shape);
-		vec![dst_tensor.add_at(&[index],inputs[0])]
+		let dst_tensor = Tensor::<T>::zero(inputs[0].shape());
+		vec![dst_tensor.add_at(&[index],inputs[1])]
 	}
 
 	fn slice_grad_backward(inputs: &Vec<NNNeuron<T>>,
@@ -353,21 +352,48 @@ where T:NeuronPrimType<T> {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 
-		
+		let &index = if let Some(ref o) = opt {
+			match o {
+				SynapseOption::SliceGrad(index) => {
+					index
+				},
+				_ => panic!("invalid option")
+			}
+		}
+		else {
+			panic!("no option")
+		};
+
+		if !inputs[0].borrow().is_constant() {
+			let (sn, output) = Self::slice(Rc::clone(&grads[0]),
+										   index);
+			sns.push(sn);
+			outputs.push(Rc::clone(&output));
+			let mut n = inputs[0].borrow_mut();
+			if let Some(ref g) = n.ref_grad() {
+				let (sn,output) = Self::add(Rc::clone(&g), output);
+				sns.push(sn);
+				outputs.push(Rc::clone(&output));
+				n.set_grad(output);
+			}
+			else {
+				n.set_grad(output);
+			}
+		}
 
 		(sns,outputs)
 	}
 
-	pub fn slice_grad(x:NNNeuron<T>, src_shape: Vec<usize>, index:usize) ->
+	pub fn slice_grad(x:NNNeuron<T>, gx:NNNeuron<T>, index:usize) ->
 		(NNSynapseNode<T>,NNNeuron<T>) {
 		let label = "slice_grad";
 		let output = nn_neuron_new(&label, Tensor::<T>::zero(&[1,1]));
-		let opt = SynapseOption::SliceGrad((index,x.borrow().ref_signal().shape().to_vec()));
+		let opt = SynapseOption::SliceGrad(index);
 		let s = Synapse::<T>::new_with_option(Self::slice_grad_forward,
 											  Self::slice_grad_backward,
 											  opt);
 		let sn = SynapseNode::<T>::new(&label,
-									   vec![Rc::clone(&x)],
+									   vec![Rc::clone(&x),Rc::clone(&gx)],
 									   vec![Rc::clone(&output)],
 									   s);
 		let rsn = Rc::new(RefCell::new(sn));
