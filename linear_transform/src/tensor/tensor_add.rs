@@ -1,7 +1,7 @@
 use std::{ops};
 use num;
 
-use crate::tensor::tensor_base::{Tensor,SubTensor};
+use crate::tensor::tensor_base::Tensor;
 
 /* T = T + T */
 impl<T> ops::Add for Tensor<T>
@@ -65,7 +65,7 @@ where T:num::Num + Copy + std::fmt::Display{
 
     pub fn add_at(&self, pos:&[usize], x:&Tensor<T>) -> Tensor<T> {
 	assert!(pos.len() > 0);
-	let st = self.get_sub_tensor_by_position(pos).unwrap_or_else(|| panic!("invalid position"));
+	let st = self.get_sub_tensor_by_position(pos).unwrap_or_else(|| panic!("invalid position {:?}",pos));
 	let start_pos = self.position_to_index(pos).unwrap_or_else(|| panic!("invalid position"));
 	let mut v = self.buffer().to_vec();
 	let xv = x.buffer();
