@@ -1,3 +1,4 @@
+/* -*- tab-width:4 -*- */
 use linear_transform::Tensor;
 
 #[test]
@@ -233,4 +234,158 @@ fn add_at_test () {
 	t3[vec![5,2,4,3]] = 1.0;
 	assert_eq!(t2,t3+t0);
     }
+}
+
+#[test]
+fn tensor_reshape_test () {
+    {
+		let shape:[usize;2] = [3,4];
+		let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
+								21.0,22.0,23.0,24.0,
+								31.0,32.0,33.0,34.0 ];
+		let t0 = Tensor::<f32>::from_array(&shape, &m_init);
+		let t1 = t0.reshape(&[4,3]);
+		println!("reshape {}", t1);
+
+		let t1 = t0.sum(&[1,1]);
+		println!("sum [1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
+
+		let t1 = t0.sum(&[1,4]);
+		println!("sum [1,4] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,4],&[63.0,66.0,69.0,72.0]));
+
+		let t1 = t0.sum(&[3,1]);
+		println!("sum [3,1] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[3,1],&[50.0,90.0,130.0]));
+    }
+    {
+		let m_init:[f32;36] = [ 111.0,112.0,113.0,114.0,
+								121.0,122.0,123.0,124.0,
+								131.0,132.0,133.0,134.0,
+								211.0,212.0,213.0,214.0,
+								221.0,222.0,223.0,224.0,
+								231.0,232.0,233.0,234.0,
+								311.0,312.0,313.0,314.0,
+								321.0,322.0,323.0,324.0,
+								331.0,332.0,333.0,334.0 ];
+		let shape:[usize;3] = [3,3,4];
+		let t0 = Tensor::<f32>::from_array(&shape, &m_init);
+		let t1 = t0.sum(&[1,1,1]);
+		println!("sum [1,1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
+
+		let t1 = t0.sum(&[1,3,4]);
+		println!("sum [1,3,4] {}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[3,4],
+												 &[633.0,636.0,639.0,642.0,
+												   663.0,666.0,669.0,672.0,
+												   693.0,696.0,699.0,702.0]));
+
+		let t1 = t0.sum(&[3,1,4]);
+		println!("sum [3,1,4] {}", t1);
+
+		let t1 = t0.sum(&[3,1,1]);
+		println!("sum [3,1,1] {}", t1);
+
+		let t1 = t0.sum(&[1,3,1]);
+		println!("sum [1,3,1] {}", t1);
+
+    }
+
+    {
+		let m_init:[f32;72] = [ 111.0,112.0,113.0,114.0,
+								121.0,122.0,123.0,124.0,
+								131.0,132.0,133.0,134.0,
+								211.0,212.0,213.0,214.0,
+								221.0,222.0,223.0,224.0,
+								231.0,232.0,233.0,234.0,
+								311.0,312.0,313.0,314.0,
+								321.0,322.0,323.0,324.0,
+								331.0,332.0,333.0,334.0,
+
+								111.0,112.0,113.0,114.0,
+								121.0,122.0,123.0,124.0,
+								131.0,132.0,133.0,134.0,
+								211.0,212.0,213.0,214.0,
+								221.0,222.0,223.0,224.0,
+								231.0,232.0,233.0,234.0,
+								311.0,312.0,313.0,314.0,
+								321.0,322.0,323.0,324.0,
+								331.0,332.0,333.0,334.0 ];
+		let shape:[usize;4] = [2,3,3,4];
+		let t0 = Tensor::<f32>::from_array(&shape, &m_init);
+		let t1 = t0.sum(&[1,1,1,1]);
+		println!("sum [1,1,1,1] {} {}", t1,IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e));
+		assert_eq!(t1, Tensor::<f32>::from_array(&[1,1],&[IntoIterator::into_iter(m_init).fold(0.0, |accum, e| accum+e)]));
+
+		let t1 = t0.sum(&[1,3,3,4]);
+		println!("sum [1,3,3,4] {}", t1);
+
+		let t1 = t0.sum(&[2,3,3,1]);
+		println!("sum [2,3,3,1] {}", t1);
+
+    }
+
+    {
+		let m_init:[f32;3] = [1.0,2.0,3.0];
+		let t0 = Tensor::<f32>::from_array(&[1,3], &m_init);
+		let t1 = t0.broadcast(&[2,3]);
+		println!("{}", t1);
+		assert_eq!(t1, Tensor::<f32>::from_array(&[2,3], &[1.0,2.0,3.0,1.0,2.0,3.0]));
+		let t2 = t1.broadcast(&[3,2,3]);
+		println!("{}", t2);
+		assert_eq!(t2, Tensor::<f32>::from_array(&[3,2,3],
+												 &[1.0,2.0,3.0,
+												   1.0,2.0,3.0,
+												   1.0,2.0,3.0,
+												   1.0,2.0,3.0,
+												   1.0,2.0,3.0,
+												   1.0,2.0,3.0]));
+    }
+}
+
+
+#[test]
+fn tensor_affine_test() {
+    let m_init:[f32;12] = [ 11.0,12.0,13.0,14.0,
+			    21.0,22.0,23.0,24.0,
+			    31.0,32.0,33.0,34.0 ];
+    let t1 = Tensor::<f32>::from_array(&[3,4],&m_init);
+    let m_init:[f32;20] = [ 11.0,12.0,13.0,14.0,15.0,
+			    21.0,22.0,23.0,24.0,25.0,
+			    31.0,32.0,33.0,34.0,35.0,
+			    41.0,42.0,43.0,44.0,45.0 ];
+    let t2 = Tensor::<f32>::from_array(&[4,5],&m_init);
+    let t3 = Tensor::<f32>::matrix_product(&t1, &t2);
+    assert_eq!(t3[vec![0,0]], 11.0*11.0+12.0*21.0+13.0*31.0+14.0*41.0);
+    assert_eq!(t3[vec![1,0]], 21.0*11.0+22.0*21.0+23.0*31.0+24.0*41.0);
+    assert_eq!(t3[vec![0,1]], 11.0*12.0+12.0*22.0+13.0*32.0+14.0*42.0);
+
+    let m_init:[f32;9] = [ 2.0,0.0,1.0,
+			   2.0,2.0,1.0,
+			   3.0,0.0,1.0 ];
+    let a = Tensor::<f32>::from_array(&[3,3],&m_init);
+    let m_init:[f32;3] = [ 1.0, 2.0, 3.0 ];
+    let v = Tensor::<f32>::from_array(&[3,1],&m_init);
+    let m_init:[f32;3] = [ 2.0, 2.0, 2.0 ];
+    let b = Tensor::<f32>::from_array(&[3,1],&m_init);
+
+    let av = Tensor::<f32>::matrix_product(&a, &v);
+
+    let av_result = [2.0*1.0+0.0*2.0+1.0*3.0,
+		     2.0*1.0+2.0*2.0+1.0*3.0,
+		     3.0*1.0+0.0*2.0+1.0*3.0];
+    assert_eq!(av,Tensor::<f32>::from_array(&[3,1],&av_result));
+
+    let c = Tensor::<f32>::affine(&a,&v,&b);
+    assert_eq!(c,av+b);
+
+    let m_init:[f32;3] = [ 6.0,2.0,1.0 ];
+    let a = Tensor::<f32>::from_array(&[1,3],&m_init);
+    let m_init:[f32;3] = [ 3.0,4.0,1.0 ];
+    let v = Tensor::<f32>::from_array(&[3,1],&m_init);
+    let av = Tensor::<f32>::matrix_product(&a, &v);
+
+    assert_eq!(av,Tensor::<f32>::from_array(&[1,1],&[3.0*6.0+2.0*4.0+1.0*1.0]));
 }

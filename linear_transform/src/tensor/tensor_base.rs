@@ -270,7 +270,14 @@ where T:Clone {
 			shape: down_shape,
 			v: &self.v[(stride*index)..(stride*(index+1))]
 		}
-    }
+	}
+
+    pub fn sub_tensor_all<'a>(&'a self) -> SubTensor<'a, T> {
+		SubTensor {
+			shape: self.shape.clone(),
+			v: &self.v
+		}
+	}
 
 	pub fn get_sub_tensor_by_position<'a>(&'a self, position:&[usize])
 										  -> Option<SubTensor<'a, T>> {

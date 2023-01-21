@@ -5,6 +5,7 @@ pub mod tensor_sub;
 pub mod tensor_mul;
 pub mod tensor_div;
 pub mod tensor_neg;
+pub mod tensor_sum;
 pub mod tensor_scale;
 pub mod tensor_pow;
 pub mod tensor_square;
