@@ -1,7 +1,7 @@
 use std::{ops};
 use num;
 
-use crate::tensor::tensor_base::Tensor;
+use crate::tensor::tensor_base::{Tensor,SubTensor};
 
 /* T = T + T */
 impl<T> ops::Add for Tensor<T>
@@ -37,7 +37,7 @@ impl<T> ops::Add<&Tensor<T>> for Tensor<T>
    where T:num::Num + Copy
 {
     type Output = Tensor<T>;
-    fn add(self, other: &Self) -> Self::Output {
+    fn add(self, other: &Tensor<T>) -> Self::Output {
 	assert_eq!(self.shape(),other.shape());
 	let lhs:&[T] = self.buffer();
 	let rhs:&[T] = other.buffer();
@@ -61,11 +61,11 @@ impl<T> ops::Add for &Tensor<T>
 }
 
 impl<T> Tensor<T>
-where T:num::Num + Copy + std::fmt::Display{
+where T:num::Num + Copy + std::fmt::Display {
 
     pub fn add_at(&self, pos:&[usize], x:&Tensor<T>) -> Tensor<T> {
 	assert!(pos.len() > 0);
-	let st = self.get_sub_tensor_by_position(pos).unwrap_or_else(|| panic!("invalid position {:?}",pos));
+	let st = self.get_subtensor_by_position(pos).unwrap_or_else(|| panic!("invalid position {:?}",pos));
 	let start_pos = self.position_to_index(pos).unwrap_or_else(|| panic!("invalid position"));
 	let mut v = self.buffer().to_vec();
 	let xv = x.buffer();
@@ -76,3 +76,40 @@ where T:num::Num + Copy + std::fmt::Display{
    }
 }
 
+/* T = &ST + &ST */
+impl<'a,T>ops::Add for &SubTensor<'a,T>
+where T:num::Num + Copy {
+    type Output = Tensor<T>;
+
+    fn add(self, other: Self) -> Self::Output {
+	assert_eq!(self.shape(),other.shape());
+	let lhs:&[T] = self.buffer();
+	let rhs:&[T] = other.buffer();
+	let v = lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| (*lhs) + (*rhs)).collect::<Vec<T>>();
+	Tensor::from_vector(self.shape().to_vec(), v)
+    }
+}
+
+impl<'a,T> ops::Add<SubTensor<'a,T>> for Tensor<T>
+where T:num::Num + Copy {
+    type Output = Tensor<T>;
+    fn add(self, other: SubTensor<'a,T>) -> Self::Output {
+	assert_eq!(self.shape(),other.shape());
+	let lhs:&[T] = self.buffer();
+	let rhs:&[T] = other.buffer();
+	let v = lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| (*lhs) + (*rhs)).collect::<Vec<T>>();
+	Tensor::from_vector(self.shape().to_vec(), v)
+    }
+}
+
+impl<'a,T> ops::Add<&SubTensor<'a,T>> for Tensor<T>
+where T:num::Num + Copy {
+    type Output = Tensor<T>;
+    fn add(self, other: &SubTensor<'a,T>) -> Self::Output {
+	assert_eq!(self.shape(),other.shape());
+	let lhs:&[T] = self.buffer();
+	let rhs:&[T] = other.buffer();
+	let v = lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| (*lhs) + (*rhs)).collect::<Vec<T>>();
+	Tensor::from_vector(self.shape().to_vec(), v)
+    }
+}

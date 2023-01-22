@@ -34,17 +34,17 @@ where T:num::Num+Clone+Copy+std::fmt::Display {
 	let rhs_tranpose_shape = rhs_transpose.shape().to_vec();
 	for i in 0..m {
 	    let a = if lhs.shape()[0] == 1 {
-		lhs.sub_tensor_all()
+		lhs.subtensor_all()
 	    }
 	    else {
-		lhs.sub_tensor(i)
+		lhs.subtensor(i)
 	    };
 	    for j in 0..l {
 		let b = if rhs_tranpose_shape[0] == 1 {
-		    rhs_transpose.sub_tensor_all()
+		    rhs_transpose.subtensor_all()
 		}
 		else {
-		    rhs_transpose.sub_tensor(j)
+		    rhs_transpose.subtensor(j)
 		};
 		v[i*l+j] = a.buffer().iter().zip(b.buffer().iter()).fold(num::zero(),|sum,(ai,bi)| sum+(*ai)*(*bi));
 	    }

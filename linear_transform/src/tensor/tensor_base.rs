@@ -241,7 +241,7 @@ where T:num::Num+Clone+Copy {
 
 impl<T> Tensor<T>
 where T:Clone {
-    pub fn sub_tensor<'a>(&'a self, index:usize) -> SubTensor<'a, T> {
+    pub fn subtensor<'a>(&'a self, index:usize) -> SubTensor<'a, T> {
 		assert!(self.shape.len() > 1);
 		if self.shape[0] == 1 {
 			assert!(index < self.shape[1])
@@ -272,14 +272,34 @@ where T:Clone {
 		}
 	}
 
-    pub fn sub_tensor_all<'a>(&'a self) -> SubTensor<'a, T> {
+    pub fn subtensor_all<'a>(&'a self) -> SubTensor<'a, T> {
 		SubTensor {
 			shape: self.shape.clone(),
 			v: &self.v
 		}
 	}
 
-	pub fn get_sub_tensor_by_position<'a>(&'a self, position:&[usize])
+	pub fn subtensors<'a>(&'a self) -> Vec<SubTensor<'a,T>> {
+		let mut subtensors = vec!();
+		assert!(self.shape.len() >= 2);
+		let num_of_subtensors = if self.shape.len() == 2 {
+			if self.shape[0] == 1 {
+				self.shape[1]
+			}
+			else {
+				self.shape[1]
+			}
+		}
+		else {
+			self.shape[0]
+		};
+		for i in 0..num_of_subtensors {
+			subtensors.push(self.subtensor(i));
+		}
+		return subtensors;
+	}
+
+	pub fn get_subtensor_by_position<'a>(&'a self, position:&[usize])
 										  -> Option<SubTensor<'a, T>> {
 		if self.shape.len() < position.len() {
 			return None;
@@ -310,7 +330,7 @@ where T:Clone {
 		})
 	}
 
-	pub fn sub_tensor_mut<'a>(&'a mut self, index:usize) -> SubTensor<'a, T> {
+	pub fn subtensor_mut<'a>(&'a mut self, index:usize) -> SubTensor<'a, T> {
 		assert!(self.shape.len() > 1);
 		if self.shape[0] == 1 {
 			assert!(index < self.shape[1])
@@ -447,7 +467,7 @@ where T:Clone{
 impl<'a, T> SubTensor<'a, T>
 where T:Clone {
 
-    pub fn sub_tensor(&'a self, index:usize) -> SubTensor<'a, T> {
+    pub fn subtensor(&'a self, index:usize) -> SubTensor<'a, T> {
 		assert!(self.shape.len() > 0);
 
 		assert!(self.shape.len() > 1);
@@ -496,7 +516,7 @@ where T:Clone {
 		self.v.len()
 	}
 
-	pub fn get_sub_tensor(st: SubTensor<'a, T>, index:usize) -> SubTensor<'a, T> {
+	pub fn get_subtensor(st: SubTensor<'a, T>, index:usize) -> SubTensor<'a, T> {
 		assert!(st.shape.len() > 0);
 		assert!(index < st.shape[0]);
 		let down_shape = st.shape[1..st.shape.len()].to_vec();

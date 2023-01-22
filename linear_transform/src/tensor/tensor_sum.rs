@@ -1,10 +1,11 @@
 /* -*- tab-width:4 -*- */
 use num;
 
-use crate::tensor::tensor_base::Tensor;
+use crate::tensor::tensor_base::{Tensor,SubTensor};
 
 impl<T> Tensor<T>
-where T:num::Num+Clone+Copy {
+where T:num::Num+Clone+Copy+std::fmt::Display {
+
     fn sum_subtensor(v:&[T],
 					 src_shape:&[usize],
 					 dst_shape:&[usize]) -> Tensor<T> {
@@ -88,7 +89,6 @@ where T:num::Num+Clone+Copy {
 	}
 
 	pub fn sum(&self, shape:&[usize]) -> Tensor<T> {
-
 		// まずは,形のチェック
 		assert_eq!(shape.len(),self.shape().len());
 		for (o,s) in self.shape().iter().zip(shape.iter()) {
@@ -98,4 +98,38 @@ where T:num::Num+Clone+Copy {
 		}
 		Self::sum_subtensor(self.buffer(), self.shape(), shape)
     }
+
+	fn sum_axis_inner<'a>(subtensors:Vec<SubTensor<'a,T>>, axis:usize) -> Tensor<T> {
+		println!("axis = {}", axis);
+		//subtensors.iter().map(|st| println!("{}",st));
+		if axis > 0 {
+			let mut ts = Vec::<Tensor<T>>::new();
+			for st in subtensors.iter() {
+				println!("{}", st);
+				let t = Self::sum_axis_inner(st.into_tensor().subtensors(), axis-1);
+				ts.push(t);
+			}
+			ts[0].clone()
+		}
+		else {
+			for st in subtensors.iter() {
+				println!("{}", st);
+			}
+			subtensors.iter().fold(Tensor::<T>::zero(subtensors[0].shape()),|s,st| s+st)
+		}
+	}
+
+	pub fn sum_axis(&self, axis:usize) -> Tensor<T> {
+		let shape = self.shape();
+		let stride = shape[axis+1..].iter().fold(1,|p,&s| p*s);
+		let dst_shape = {
+			let mut v = shape.to_vec();
+			v.remove(axis);
+			v
+		};
+		println!("shape:{:?}",shape);
+		println!("stride:{}",stride);
+		println!("dst_shape: {:?}",dst_shape);
+		Tensor::<T>::zero(&[1,1])
+	}
 }
