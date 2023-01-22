@@ -267,7 +267,7 @@ where T:NeuronPrimType<T> {
 		else {
 			panic!("no option")
 		};
-		let sub_tensor = inputs[0].sub_tensor(index).into_tensor();
+		let sub_tensor = inputs[0].subtensor(index).into_tensor();
 		vec![sub_tensor]
 	}
 
