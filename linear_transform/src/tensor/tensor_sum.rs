@@ -99,37 +99,25 @@ where T:num::Num+Clone+Copy+std::fmt::Display {
 		Self::sum_subtensor(self.buffer(), self.shape(), shape)
     }
 
-	fn sum_axis_inner<'a>(subtensors:Vec<SubTensor<'a,T>>, axis:usize) -> Tensor<T> {
-		println!("axis = {}", axis);
-		//subtensors.iter().map(|st| println!("{}",st));
-		if axis > 0 {
-			let mut ts = Vec::<Tensor<T>>::new();
-			for st in subtensors.iter() {
-				println!("{}", st);
-				let t = Self::sum_axis_inner(st.into_tensor().subtensors(), axis-1);
-				ts.push(t);
+	pub fn sum_axis(&self, axis:usize) -> Tensor<T> {
+		if self.shape().len() == 0 {
+			panic!("invalid source shape.");
+		}
+		else if self.shape().len() == 1 {
+			if axis != 0 {
+				panic!("invalid source shape.");
 			}
-			ts[0].clone()
+			else {
+				Tensor::<T>::from_vector(vec!(), vec![self.buffer().iter().fold(num::zero(),|s,&e| s+e)])
+			}
 		}
 		else {
-			for st in subtensors.iter() {
-				println!("{}", st);
-			}
-			subtensors.iter().fold(Tensor::<T>::zero(subtensors[0].shape()),|s,st| s+st)
+			let dst_shape = {
+				let mut v = self.shape().to_vec();
+				v[axis] = 1;
+				v
+			};
+			self.sum(&dst_shape)
 		}
-	}
-
-	pub fn sum_axis(&self, axis:usize) -> Tensor<T> {
-		let shape = self.shape();
-		let stride = shape[axis+1..].iter().fold(1,|p,&s| p*s);
-		let dst_shape = {
-			let mut v = shape.to_vec();
-			v.remove(axis);
-			v
-		};
-		println!("shape:{:?}",shape);
-		println!("stride:{}",stride);
-		println!("dst_shape: {:?}",dst_shape);
-		Tensor::<T>::zero(&[1,1])
 	}
 }

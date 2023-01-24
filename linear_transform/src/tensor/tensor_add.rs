@@ -1,4 +1,4 @@
-use std::{ops};
+use std::ops;
 use num;
 
 use crate::tensor::tensor_base::{Tensor,SubTensor};
