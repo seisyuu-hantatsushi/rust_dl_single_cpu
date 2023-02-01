@@ -6,7 +6,7 @@ use crate::tensor::tensor_base::{Tensor,SubTensor};
 impl<T> Tensor<T>
 where T:num::Num+Clone+Copy+std::fmt::Display {
 
-    fn sum_subtensor(v:&[T],
+	fn sum_subtensor(v:&[T],
 					 src_shape:&[usize],
 					 dst_shape:&[usize]) -> Tensor<T> {
 		let t = if dst_shape.len() > 2 {
@@ -20,43 +20,43 @@ where T:num::Num+Clone+Copy+std::fmt::Display {
 													});
 				Self::sum_subtensor(&sum_tensor_v, &src_shape[1..], &dst_shape[1..])
 			}
-	    else {
-			let mut ts:Vec<Tensor<T>> = vec!();
-			let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
-			let strided_vec = v.chunks(stride);
-			for sv in strided_vec {
-				let t = Self::sum_subtensor(sv, &src_shape[1..], &dst_shape[1..]);
-				ts.push(t);
-			}
-			let mut v:Vec<T> = vec!();
-			for t in ts.iter() {
-				v.extend(t.buffer());
-			}
-
-			fn new_reshaper(shape:&[usize]) -> Vec<usize> {
-				if shape.len() > 2 {
-					let mut v:Vec<usize> = vec!();
-					if shape[0] != 1 {
-						v.push(shape[0]);
-					}
-					v.extend(&new_reshaper(&shape[1..]));
-					v
+			else {
+				let mut ts:Vec<Tensor<T>> = vec!();
+				let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
+				let strided_vec = v.chunks(stride);
+				for sv in strided_vec {
+					let t = Self::sum_subtensor(sv, &src_shape[1..], &dst_shape[1..]);
+					ts.push(t);
 				}
-				else {
-					if shape[0] == 1 && shape[1] == 1 {
-						vec![1]
-					}
-					else if shape[0] != 1 && shape[1] != 1 {
-						shape.to_vec()
+				let mut v:Vec<T> = vec!();
+				for t in ts.iter() {
+					v.extend(t.buffer());
+				}
+
+				fn new_reshaper(shape:&[usize]) -> Vec<usize> {
+					if shape.len() > 2 {
+						let mut v:Vec<usize> = vec!();
+						if shape[0] != 1 {
+							v.push(shape[0]);
+						}
+						v.extend(&new_reshaper(&shape[1..]));
+						v
 					}
 					else {
-						vec![shape[0]*shape[1]]
+						if shape[0] == 1 && shape[1] == 1 {
+							vec![1]
+						}
+						else if shape[0] != 1 && shape[1] != 1 {
+							shape.to_vec()
+						}
+						else {
+							vec![shape[0]*shape[1]]
+						}
 					}
 				}
-			}
-			let new_shape = new_reshaper(&dst_shape);
-			Tensor::from_vector(new_shape, v)
-	    };
+				let new_shape = new_reshaper(&dst_shape);
+				Tensor::from_vector(new_shape, v)
+			};
 			t
 		}
 		else {
