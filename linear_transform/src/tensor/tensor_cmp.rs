@@ -3,6 +3,7 @@ use num;
 
 use crate::tensor::tensor_base::{Tensor,SubTensor};
 
+#[derive(Copy, Clone)]
 enum Operator {
 	MAX, MIN
 }
@@ -18,7 +19,14 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 		}
 	}
 
-	fn max_subtensor(v:&[T],src_shape:&[usize],dst_shape:&[usize]) -> Tensor<T> {
+	fn compare_values(op: Operator, a:&T, b:&T) -> T {
+		match op {
+			Operator::MAX => if a < b { *b } else { *a }
+			Operator::MIN => if a > b { *b } else { *a }
+		}
+	}
+
+	fn max_min_subtensor(v:&[T],src_shape:&[usize],dst_shape:&[usize], op:Operator) -> Tensor<T> {
 		if dst_shape.len() > 2 {
 			if dst_shape[0] == 1 {
 				let stride = src_shape[1..].iter().fold(1,|p,&e| p*e);
@@ -26,21 +34,21 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 				let max_tensor_v = if let Some(first_v) = strided_vecs.nth(0) {
 					strided_vecs.fold(first_v.to_vec(),
 									  |max_v, v| {
-										  let compare_tuple_max = |p| Self::compare_tuple(Operator::MAX, p);
+										  let compare_tuple_max = |p| Self::compare_tuple(op, p);
 										  max_v.iter().zip(v.iter()).map(compare_tuple_max).collect::<Vec<T>>()
 									  })
 				}
 				else {
 					panic!("no element in Tensor")
 				};
-				Self::max_subtensor(&max_tensor_v, &src_shape[1..], &dst_shape[1..])
+				Self::max_min_subtensor(&max_tensor_v, &src_shape[1..], &dst_shape[1..],op)
 			}
 			else {
 				let mut ts:Vec<Tensor<T>> = vec!();
 				let stride = src_shape[1..].iter().fold(1,|prod, &e| prod*e);
 				let strided_vec = v.chunks(stride);
 				for sv in strided_vec {
-					let t = Self::max_subtensor(sv, &src_shape[1..], &dst_shape[1..]);
+					let t = Self::max_min_subtensor(sv, &src_shape[1..], &dst_shape[1..],op);
 					ts.push(t);
 				}
 				let mut v:Vec<T> = vec!();
@@ -81,8 +89,9 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 				let mut strided_vecs = v.chunks(dst_shape[1]);
 				let max_tensor_v = if let Some(first_v) = strided_vecs.nth(0) {
 					strided_vecs.fold(first_v.to_vec(),
-									  |mv, v|
-									  mv.iter().zip(v.iter()).map(|(&a,&b)| if a < b { b } else { a } ).collect::<Vec<T>>())
+									  |mv, v| {
+										  mv.iter().zip(v.iter())
+											  .map(|p| Self::compare_tuple(op, p)).collect::<Vec<T>>() })
 				}
 				else {
 					panic!("no element in Tensor")
@@ -93,20 +102,14 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 				let strided_vecs = v.chunks(src_shape[1]);
 				let max_tensor_v =
 					strided_vecs.map(|v| {
-						if let Some(m) = v.to_vec().into_iter().reduce(|m, e| { if m < e { e } else { m } }) {
+						let compare_value_max = |a:T,b:T| Self::compare_values(op, &a, &b);
+						if let Some(m) = v.to_vec().into_iter().reduce(compare_value_max) {
 							m
 						}
 						else {
 							panic!("no element in Tensor")
 						}
 					}).collect::<Vec<T>>();
-				/*
-				let mut sum_v:Vec<T> = vec!();
-				for v in strided_vec {
-					let s = v.iter().fold(num::zero(),|accum,&e| accum + e);
-					sum_v.push(s);
-				}
-				 */
 				Tensor::from_vector(vec![dst_shape[0],1],max_tensor_v)
 			}
 			else {
@@ -115,12 +118,13 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 		}
 	}
 
-	pub fn max_in_axis(&self, axis:usize) -> Tensor<T> {
+	fn max_min_in_axis(&self, axis:usize, op:Operator) -> Tensor<T> {
 		if self.shape().len() == 0 {
 			self.clone()
 		}
 		else if self.shape().len() == 1 {
-			let &max = if let Some(m) = self.buffer().into_iter().reduce(|m,e| { if m < e { e } else { m } }) {
+			let compare_value_max = |a:T,b:T| Self::compare_values(op, &a, &b);
+			let max = if let Some(m) = self.buffer().to_vec().into_iter().reduce(compare_value_max) {
 				m
 			}
 			else {
@@ -134,7 +138,15 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 				v[axis] = 1;
 				v
 			};
-			Self::max_subtensor(self.buffer(), self.shape(), &dst_shape)
+			Self::max_min_subtensor(self.buffer(), self.shape(), &dst_shape, op)
 		}
+	}
+
+	pub fn max_in_axis(&self, axis:usize) -> Tensor<T> {
+		self.max_min_in_axis(axis, Operator::MAX)
+	}
+
+	pub fn min_in_axis(&self, axis:usize) -> Tensor<T> {
+		self.max_min_in_axis(axis, Operator::MIN)
     }
 }
