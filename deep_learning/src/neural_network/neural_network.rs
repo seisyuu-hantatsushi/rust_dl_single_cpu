@@ -324,6 +324,13 @@ where T:NeuronPrimType<T> {
 		output
 	}
 
+	pub fn softmax(&mut self, x0:NNNeuron<T>, axis:usize) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::softmax(x0, axis);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn forward_propagating(&mut self, order:usize) -> Result<Vec<NNNeuron<T>>,String> {
 		if order < self.cg_order.len() {
 			let outputs = self.cg_order[order].forward();

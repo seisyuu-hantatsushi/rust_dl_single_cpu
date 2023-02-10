@@ -13,6 +13,7 @@ where T:NeuronPrimType<T> {
 	Sum((Vec<usize>,Vec<usize>)),
 	Slice((usize, Vec<usize>)),
 	SliceGrad(usize),
+	Softmax(usize),
 	Scale(T)
 }
 

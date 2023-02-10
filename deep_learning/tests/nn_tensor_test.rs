@@ -720,3 +720,28 @@ fn slice_test() -> Result<(),Box<dyn std::error::Error>> {
 	}
 	Ok(())
 }
+
+#[test]
+fn softmax_test() -> Result<(),Box<dyn std::error::Error>> {
+	let v_init:Vec<f64> = vec![-0.615,-0.427,0.317,
+							   -0.763,-0.249,0.185,
+							   -0.520,-0.962,0.578,
+							   -0.942,-0.503,0.175 ];
+	let src_tensor = Tensor::<f64>::from_vector(vec![4,3], v_init);
+	let mut nn = NeuralNetwork::<f64>::new();
+	let x0 = nn.create_neuron("x0", src_tensor.clone());
+	let y = nn.softmax(Rc::clone(&x0), 1);
+	let softmax_result:Vec<f64> = vec![0.210,0.254,0.535,
+									   0.190,0.318,0.491,
+									   0.215,0.138,0.646,
+									   0.178,0.276,0.545];
+	let result =
+		y.borrow().ref_signal().buffer().iter().zip(softmax_result.iter())
+		.fold(true,|b, (y,r)|
+			  { b & ((y - r).abs() < 0.001) });
+	if !result {
+		return Err(Box::new(MyError::StringMsg("invalid result".to_string())));
+	}
+
+	Ok(())
+}
