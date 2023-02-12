@@ -39,6 +39,56 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 						opt:&Option<SynapseOption<T>>) -> (Vec<NNSynapseNode<T>>, Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+		let &axis = if let Some(o) = opt {
+			if let SynapseOption::Softmax(axis) = o {
+				axis
+			}
+			else {
+				panic!("Invalid Option")
+			}
+		}
+		else {
+			panic!("Invalid Option")
+		};
+
+		let (sn,y) = Self::softmax(Rc::clone(&inputs[0]), axis);
+		sns.push(sn);
+		outputs.push(Rc::clone(&y));
+
+		let (sn,gx) = Self::hadamard_product(Rc::clone(&y),Rc::clone(&grads[0]));
+		sns.push(sn);
+		outputs.push(Rc::clone(&gx));
+
+		let (sn,sumdx) = Self::sum_in_axis(Rc::clone(&gx), axis);
+		sns.push(sn);
+		outputs.push(Rc::clone(&sumdx));
+
+		let dst_shape = sumdx.borrow().shape().to_vec();
+		let (sn,dx) = Self::broadcast_to(sumdx, &dst_shape);
+		sns.push(sn);
+		outputs.push(Rc::clone(&dx));
+
+		let (sn,gz) = Self::hadamard_product(y, Rc::clone(&dx));
+		sns.push(sn);
+		outputs.push(Rc::clone(&gz));
+
+		let (sn,gx) = Self::sub(gx, gz);
+		sns.push(sn);
+		outputs.push(Rc::clone(&gx));
+
+		let mut n = inputs[0].borrow_mut();
+		if let Some(ref g) = n.ref_grad() {
+			let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&gx));
+			sns.push(sn);
+			output.borrow_mut().rename(&format!("{}+", g.borrow().name()));
+			outputs.push(Rc::clone(&output));
+			n.set_grad(output)
+		}
+		else {
+			gx.borrow_mut().rename(&format!("({})'", n.name()));
+			n.set_grad(gx)
+		}
+
 		(sns,outputs)
     }
 

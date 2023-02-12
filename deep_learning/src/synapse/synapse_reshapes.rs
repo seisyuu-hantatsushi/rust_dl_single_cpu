@@ -186,6 +186,24 @@ where T:NeuronPrimType<T> {
 		(rsn, output)
 	}
 
+	pub fn sum_in_axis(x:NNNeuron<T>, axis:usize) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		let label = "sum_axis";
+		let output = nn_neuron_new(&label, Tensor::<T>::zero(&[1,1]));
+		let mut dst_shape = x.borrow().shape().to_vec();
+		dst_shape[axis] = 1;
+		let s = Synapse::<T>::new_with_option(Self::sum_to_forward,
+											  Self::sum_to_backward,
+											  SynapseOption::Sum((x.borrow().ref_signal().shape().to_vec(), dst_shape)));
+		let sn = SynapseNode::<T>::new(&label,
+									   vec![Rc::clone(&x)],
+									   vec![Rc::clone(&output)],
+									   s);
+		let rsn = Rc::new(RefCell::new(sn));
+		output.borrow_mut().set_generator(Rc::clone(&rsn));
+		rsn.borrow().forward();
+		(rsn, output)
+	}
+
 	fn broadcast_to_forward(inputs: Vec<&Tensor<T>>, opt: &Option<SynapseOption<T>>)
 							-> Vec<Tensor<T>> {
 		let dst_shape = if let Some(o) = opt {

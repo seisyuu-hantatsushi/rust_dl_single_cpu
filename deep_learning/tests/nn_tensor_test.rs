@@ -721,8 +721,41 @@ fn slice_test() -> Result<(),Box<dyn std::error::Error>> {
 	Ok(())
 }
 
+fn numerical_grad(f:&(dyn Fn(&Tensor::<f64>) -> Tensor::<f64>),
+				  t:&Tensor::<f64>,
+				  delta:f64 ) -> Tensor::<f64> {
+
+	let mut pos:usize = 0;
+	let mut v:Vec<f64> = Vec::new();
+
+	for x in t.buffer().iter() {
+		let mut forward_t  = t.clone();
+		let mut backward_t = t.clone();
+
+		forward_t.replace_element_by_index(pos,  x-delta);
+		backward_t.replace_element_by_index(pos, x+delta);
+
+		let forward_ft  = f(&forward_t);
+		let backward_ft = f(&backward_t);
+		let diff = (backward_ft - forward_ft).sum(&[1,1])[vec![0,0]];
+		v.push(diff);
+		pos += 1;
+	}
+
+	Tensor::<f64>::from_vector(t.shape().to_vec(), v)
+}
+
 #[test]
 fn softmax_test() -> Result<(),Box<dyn std::error::Error>> {
+
+	fn softmax(t:&Tensor<f64>, axis:usize) -> Tensor<f64> {
+		let src_shape = t.shape();
+		let max = t.max_in_axis(axis).broadcast(src_shape);
+		let y = (t - max).exp();
+		let sum_y = y.sum_axis(axis).broadcast(src_shape);
+		Tensor::<f64>::hadamard_division(&y, &sum_y)
+	}
+
 	let v_init:Vec<f64> = vec![-0.615,-0.427,0.317,
 							   -0.763,-0.249,0.185,
 							   -0.520,-0.962,0.578,
@@ -731,16 +764,34 @@ fn softmax_test() -> Result<(),Box<dyn std::error::Error>> {
 	let mut nn = NeuralNetwork::<f64>::new();
 	let x0 = nn.create_neuron("x0", src_tensor.clone());
 	let y = nn.softmax(Rc::clone(&x0), 1);
-	let softmax_result:Vec<f64> = vec![0.210,0.254,0.535,
-									   0.190,0.318,0.491,
-									   0.215,0.138,0.646,
-									   0.178,0.276,0.545];
+	let softmax_result = softmax(&src_tensor,1);
+	println!("softmax result:{}",y.borrow());
 	let result =
-		y.borrow().ref_signal().buffer().iter().zip(softmax_result.iter())
+		y.borrow().ref_signal().buffer().iter().zip(softmax_result.buffer().iter())
 		.fold(true,|b, (y,r)|
 			  { b & ((y - r).abs() < 0.001) });
 	if !result {
 		return Err(Box::new(MyError::StringMsg("invalid result".to_string())));
+	}
+
+	let softmax_axis = |t:&Tensor<f64>| -> Tensor<f64> { softmax(t,1) };
+	let numgrad = numerical_grad(&softmax_axis, &src_tensor, 0.0001);
+
+	nn.backward_propagating(0)?;
+	{
+		let borrowed_x0 = x0.borrow();
+		if let Some(ref gx0) = borrowed_x0.ref_grad() {
+			println!("{}",gx0.borrow());
+			let result =gx0.borrow().ref_signal().buffer().iter().zip(numgrad.buffer().iter())
+				.fold(true,|b, (y,r)|
+					  { b & ((y - r).abs() < 0.001) });
+			if !result {
+				return Err(Box::new(MyError::StringMsg("invalid result".to_string())));
+			}
+		}
+		else {
+			return Err(Box::new(MyError::StringMsg("no grad".to_string())));
+		}
 	}
 
 	Ok(())
