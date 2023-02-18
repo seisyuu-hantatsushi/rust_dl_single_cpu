@@ -7,6 +7,7 @@ pub mod tensor_div;
 pub mod tensor_neg;
 pub mod tensor_sum;
 pub mod tensor_cmp;
+pub mod tensor_clip;
 pub mod tensor_scale;
 pub mod tensor_pow;
 pub mod tensor_square;

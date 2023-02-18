@@ -127,6 +127,10 @@ impl<T> Tensor<T>
 		Self::position_to_index_inner(0, self.shape(), position)
 	}
 
+	pub fn replace_element(&mut self, v:Vec<T>) {
+		self.v = v.into_boxed_slice();
+	}
+
 	pub fn replace_element_by_index(&mut self, index:usize, e:T) {
 		self.v[index] = e;
 	}

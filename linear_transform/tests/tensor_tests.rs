@@ -1,5 +1,8 @@
 /* -*- tab-width:4 -*- */
 use linear_transform::Tensor;
+use rand_xorshift;
+use rand::{SeedableRng,Rng};
+use rand_distr::{Uniform,Distribution};
 
 #[test]
 fn tensor_scaler_test() {
@@ -533,4 +536,22 @@ fn tensor_max_test() {
 														84.0,89.0,94.0,99.0,
 														104.0,109.0,114.0,119.0]));
 	}
+}
+
+#[test]
+fn tensor_clip_test() {
+	let mut rng = rand_xorshift::XorShiftRng::from_entropy();
+	let uniform_dist = Uniform::new(-1.0,1.0);
+	let mut t1 = Tensor::<f64>::from_vector(
+		vec![5*6],
+		(0..5*6).map(|_|
+					 uniform_dist.sample(&mut rng)
+		).collect::<Vec<f64>>());
+	println!("{t1}");
+	let cliped_t = t1.clip(0.0,0.9);
+	let result = cliped_t.buffer().iter().fold(true, |b,&e| b && 0.0 <= e && e <= 0.9);
+	assert!(result);
+	t1.clip_self(-0.9,0.9);
+	let result = t1.buffer().iter().fold(true, |b,&e| b && -0.9 <= e && e <= 0.9);
+	assert!(result);
 }
