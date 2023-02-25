@@ -14,8 +14,8 @@ where T:NeuronPrimType<T> {
 	}
 
 	pub fn sigmoid_backward(inputs: &Vec<NNNeuron<T>>,
-						   grads: &Vec<NNNeuron<T>>,
-						   opt: &Option<SynapseOption<T>>)
+							grads: &Vec<NNNeuron<T>>,
+							_opt: &Option<SynapseOption<T>>)
 					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();

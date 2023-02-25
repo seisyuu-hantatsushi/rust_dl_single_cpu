@@ -101,7 +101,7 @@ where T: NeuronPrimType<T> {
 				}
 			},
 			Optimizer::MomentumSDG(msgd) => {
-				let mut ctx = if let Some(ref mut ctx) = self.optimizer_context {
+				let ctx = if let Some(ref mut ctx) = self.optimizer_context {
 					match ctx {
 						OptimizerContext::MomentumSDG(ctx) => {
 							ctx

@@ -3,7 +3,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rand::prelude::*;
 use rand::SeedableRng;
 use rand_distr::{Normal,Distribution};
 use rand_pcg::Pcg64;
@@ -93,8 +92,7 @@ where T:NeuronPrimType<T> {
 					panic!("already set input variable");
 				}
 				ns
-			},
-			_ => vec!()
+			}
 		}
 	}
 }

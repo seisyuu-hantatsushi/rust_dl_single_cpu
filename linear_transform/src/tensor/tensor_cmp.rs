@@ -1,7 +1,7 @@
 /* -*- tab-width:4 -*- */
 use num;
 
-use crate::tensor::tensor_base::{Tensor,SubTensor};
+use crate::tensor::tensor_base::Tensor;
 
 #[derive(Copy, Clone)]
 enum Operator {

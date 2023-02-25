@@ -59,4 +59,10 @@ where T:num::Num+Clone+Copy {
 		let v = Self::broadcast_subtensor(self.buffer(), &src_shape, &dst_shape);
 		Tensor::from_vector(dst_shape.to_vec(), v)
     }
+
+	pub fn ravel(&self) -> Tensor<T> {
+		let shape = vec![1, self.num_of_elements()];
+		Tensor::<T>::from_vector(shape,self.buffer().to_vec())
+	}
+
 }

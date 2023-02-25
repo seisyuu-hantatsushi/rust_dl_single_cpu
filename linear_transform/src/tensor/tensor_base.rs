@@ -216,6 +216,25 @@ where T:num::Num+Clone+Copy {
 		}
     }
 
+	pub fn identity(size:usize) -> Tensor<T> {
+		let shape = vec![size,size];
+		let mut v:Vec<T> = Vec::with_capacity(size*size);
+		for n in 0..size {
+			for m in 0..size {
+				if n == m {
+					v.push(num::one());
+				}
+				else {
+					v.push(num::zero());
+				}
+			}
+		}
+		Tensor {
+			shape: shape,
+			v: v.into_boxed_slice()
+		}
+	}
+
     pub fn from_array<'a>(shape:&'a [usize], elements:&'a [T]) -> Tensor<T> {
 		let product = shape.iter().fold(1,|prod, x| prod * (*x));
 		assert_eq!(product, elements.len());

@@ -1,7 +1,7 @@
 /* -*- tab-width:4 -*- */
 use num;
 
-use crate::tensor::tensor_base::{Tensor,SubTensor};
+use crate::tensor::tensor_base::Tensor;
 
 impl<T> Tensor<T>
 where T:num::Num+Clone+Copy+std::fmt::Display {

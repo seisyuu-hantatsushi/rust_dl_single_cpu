@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use num::ToPrimitive;
 use linear_transform::tensor::Tensor;
 use crate::synapse::{Synapse,SynapseOption,SynapseNode,NNSynapseNode};
 use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
@@ -50,6 +51,7 @@ where T:NeuronPrimType<T> {
 		let (sn, gy) = Self::hadamard_product(gy,scale);
 		sns.push(sn);
 		outputs.push(Rc::clone(&gy));
+
 		if !inputs[0].borrow().is_constant() {
 			let mut n = inputs[0].borrow_mut();
 			if let Some(ref g) = n.ref_grad(){
@@ -93,4 +95,90 @@ where T:NeuronPrimType<T> {
 		rsn.borrow().forward();
 		(rsn, output)
 	}
+
+
+	fn softmax_cross_entropy_error_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
+										   -> Vec<Tensor<T>> {
+		let orig_shape = inputs[0].shape().to_vec();
+		let m = inputs[0].max_in_axis(1);
+		let y = inputs[0] - m.broadcast(&orig_shape);
+		let y = y.exp();
+		let s = y.sum_axis(1);
+		let s = s.ln();
+		let log_z = m + s;
+		let log_p = inputs[0] - log_z.broadcast(&orig_shape);
+		let t_line = inputs[1].ravel();
+		let label = 0..orig_shape[0];
+		let log_p_v = label.zip(t_line.buffer().iter()).map(|(l,t)| {
+			log_p[vec![l.to_usize().unwrap(), t.to_usize().unwrap()]]
+		}).collect::<Vec<T>>();
+		let log_p_sum = log_p_v.iter().fold(num::zero(),|s:T,&e| { s + e });
+		vec![Tensor::<T>::from_array(&[1,1],&[-log_p_sum/(num::FromPrimitive::from_usize(orig_shape[0]).unwrap())])]
+	}
+
+	fn softmax_cross_entropy_error_backward(inputs: &Vec<NNNeuron<T>>,
+											grads: &Vec<NNNeuron<T>>,
+											_opt: &Option<SynapseOption<T>>)
+					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
+		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+		let x_shape = inputs[0].borrow().shape().to_vec();
+		let scale_t = Tensor::<T>::new_set_value(grads[0].borrow().shape(),
+												 num::one::<T>()/num::FromPrimitive::from_usize(x_shape[0]).unwrap());
+		let scale_n = nn_neuron_constant(&("1/".to_string()+&x_shape[0].to_string()), scale_t);
+		outputs.push(Rc::clone(&scale_n));
+		let (sn,gy) = Self::hadamard_product(Rc::clone(&grads[0]), scale_n);
+		sns.push(sn);
+		outputs.push(Rc::clone(&gy));
+		let (sn,y) = Self::softmax(Rc::clone(&inputs[0]), 1);
+		sns.push(sn);
+		outputs.push(Rc::clone(&y));
+		let onehot_t = {
+			let mut v:Vec<T> = vec!();
+			let id = Tensor::<T>::identity(x_shape[1]);
+			let label:Vec<usize> =
+				inputs[1].borrow().ref_signal().buffer().iter().map(|e| e.to_usize().unwrap()).collect();
+			for l in label.iter() {
+				//println!("selector {} {}", l, id.subtensor(*l));
+				v.extend(id.subtensor(*l).buffer().to_vec());
+			}
+			Tensor::<T>::from_vector(vec![label.len(), id.shape()[1]], v)
+		};
+		let onehot_n = nn_neuron_constant("selector", onehot_t);
+		outputs.push(Rc::clone(&onehot_n));
+		let (sn,y) = Self::sub(y,onehot_n);
+		sns.push(sn);
+		outputs.push(Rc::clone(&y));
+		let (sn,gx) = Self::hadamard_product(y,gy);
+		sns.push(sn);
+		outputs.push(Rc::clone(&gx));
+
+		if !inputs[0].borrow().is_constant() {
+			let mut n = inputs[0].borrow_mut();
+			if let Some(ref g) = n.ref_grad(){
+				let (sn, output) = Self::sub(Rc::clone(&g), Rc::clone(&gx));
+				sns.push(sn);
+				outputs.push(output);
+				n.set_grad(Rc::clone(&gx));
+			}
+			else {
+				n.set_grad(Rc::clone(&gx));
+			}
+		}
+
+		(sns, outputs)
+	}
+
+	pub fn softmax_cross_entropy_error(x:NNNeuron<T>,t:NNNeuron<T>) ->
+		(NNSynapseNode<T>, NNNeuron<T>) {
+			let label = "softmax_cross_entropy_error";
+			let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
+			let s = Synapse::<T>::new(Self::softmax_cross_entropy_error_forward,
+									  Self::softmax_cross_entropy_error_backward);
+			let sn = SynapseNode::<T>::new(&label, vec![Rc::clone(&x),Rc::clone(&t)], vec![Rc::clone(&output)], s);
+			let rsn = Rc::new(RefCell::new(sn));
+			output.borrow_mut().set_generator(Rc::clone(&rsn));
+			rsn.borrow().forward();
+			(rsn, output)
+		}
 }

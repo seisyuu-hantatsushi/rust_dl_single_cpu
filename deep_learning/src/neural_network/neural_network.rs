@@ -5,6 +5,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::{BTreeSet,HashMap};
 
+use rand::{Rng,SeedableRng};
+use rand_distr::{Normal,Distribution};
+use rand_pcg::Pcg64;
+
 use linear_transform::tensor::Tensor;
 use crate::neuron::{NeuronPrimType,NNNeuron,Neuron,nn_neuron_new,nn_neuron_constant};
 use crate::synapse::{NNSynapseNode,SynapseNode};
@@ -160,6 +164,7 @@ where T:NeuronPrimType<T> {
 
 pub struct NeuralNetwork<T>
 where T: NeuronPrimType<T>{
+	rng: Pcg64,
 	cg_order: Vec<ComputationalGraph<T>>
 }
 
@@ -168,6 +173,7 @@ where T:NeuronPrimType<T> {
 
 	pub fn new() -> NeuralNetwork<T> {
 		NeuralNetwork {
+			rng: Pcg64::from_entropy(),
 			cg_order: vec![ComputationalGraph::<T>::new()]
 		}
 	}
@@ -324,6 +330,13 @@ where T:NeuronPrimType<T> {
 		output
 	}
 
+	pub fn softmax_cross_entropy_error(&mut self, x:NNNeuron<T>, t:NNNeuron<T>) -> NNNeuron<T> {
+		let (sn,output) = SynapseNode::<T>::softmax_cross_entropy_error(x, t);
+		self.cg_order[0].append_nodes(vec![sn]);
+		self.cg_order[0].append_neurons(vec![Rc::clone(&output)]);
+		output
+	}
+
 	pub fn softmax(&mut self, x0:NNNeuron<T>, axis:usize) -> NNNeuron<T> {
 		let (sn,output) = SynapseNode::<T>::softmax(x0, axis);
 		self.cg_order[0].append_nodes(vec![sn]);
@@ -385,6 +398,8 @@ where T:NeuronPrimType<T> {
 		};
 		sns
 	}
+
+	pub fn get_rng(&mut self) -> &mut Pcg64 { &mut self.rng }
 
 	pub fn make_dot_graph(&mut self, order:usize, file_name:&str) -> Result<(),String> {
 		if order < self.cg_order.len() {

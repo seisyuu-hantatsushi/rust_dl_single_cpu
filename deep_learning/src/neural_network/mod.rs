@@ -1,4 +1,5 @@
 pub mod neural_network;
+pub mod random;
 pub mod layer;
 pub mod model;
 pub mod optimizer;

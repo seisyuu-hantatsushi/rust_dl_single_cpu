@@ -738,7 +738,7 @@ fn numerical_grad(f:&(dyn Fn(&Tensor::<f64>) -> Tensor::<f64>),
 		let forward_ft  = f(&forward_t);
 		let backward_ft = f(&backward_t);
 		let diff = (backward_ft - forward_ft).sum(&[1,1])[vec![0,0]];
-		v.push(diff);
+		v.push(diff/2.0*delta);
 		pos += 1;
 	}
 
@@ -782,7 +782,7 @@ fn softmax_test() -> Result<(),Box<dyn std::error::Error>> {
 		let borrowed_x0 = x0.borrow();
 		if let Some(ref gx0) = borrowed_x0.ref_grad() {
 			println!("{}",gx0.borrow());
-			let result =gx0.borrow().ref_signal().buffer().iter().zip(numgrad.buffer().iter())
+			let result = gx0.borrow().ref_signal().buffer().iter().zip(numgrad.buffer().iter())
 				.fold(true,|b, (y,r)|
 					  { b & ((y - r).abs() < 0.001) });
 			if !result {

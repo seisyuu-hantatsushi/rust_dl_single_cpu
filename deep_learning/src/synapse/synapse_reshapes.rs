@@ -296,7 +296,7 @@ where T:NeuronPrimType<T> {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
 
-		let (index, src_shape) = if let Some(ref o) = opt {
+		let (index, _) = if let Some(ref o) = opt {
 			match o {
 				SynapseOption::Slice(s) => s,
 				_ => panic!("invalid option")

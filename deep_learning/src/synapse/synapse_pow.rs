@@ -121,7 +121,7 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 				nn_neuron_constant(&label, t)
 			}
 			else {
-				let one = nn_neuron_constant("1,0", Tensor::<T>::one(&[1,1]));
+				let one = nn_neuron_constant("1.0", Tensor::<T>::one(&[1,1]));
 				outputs.push(Rc::clone(&one));
 				let (dec_index_sn, dec_index) = Self::sub(Rc::clone(&inputs[1]),one);
 				sns.push(dec_index_sn);
