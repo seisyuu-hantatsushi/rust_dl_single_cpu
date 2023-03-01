@@ -555,3 +555,17 @@ fn tensor_clip_test() {
 	let result = t1.buffer().iter().fold(true, |b,&e| b && -0.9 <= e && e <= 0.9);
 	assert!(result);
 }
+
+#[test]
+fn tensor_iter_test() {
+	let mut rng = rand_xorshift::XorShiftRng::from_entropy();
+	let uniform_dist = Uniform::new(-1.0,1.0);
+	let v = (0..100*2).map(|_| uniform_dist.sampe(&mut rng))
+		.collect::<Vec<f64>>();
+	let t1 = Tensor::<f64>::from_vector(vec![100,2], v);
+
+	for s in t1.iter() {
+		println!("{}", s)
+	}
+
+}
