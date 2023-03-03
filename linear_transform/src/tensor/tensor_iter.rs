@@ -23,7 +23,7 @@ impl<'a,T> Iterator for TensorIter<'a, T>
 where T:Clone {
     type Item = SubTensor<'a, T>;
     fn next(&mut self) -> Option<Self::Item> {
-	if self.rt.num_of_elements() < self.index {
+	if self.index < self.rt.shape()[0] {
 	    let current = self.index;
 	    self.index += 1;
 	    Some(self.rt.subtensor(current))

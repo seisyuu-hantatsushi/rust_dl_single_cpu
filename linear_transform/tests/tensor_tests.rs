@@ -69,7 +69,7 @@ fn tensor_vector_test() {
 	let t5 = t2 * s2;
 	assert_eq!(t4, t5);
 
-	let t1 = Tensor::<f32>::from_vector(vec![5],(0..5).map(|i| i as f32).collect::<Vec<f32>>());
+	//let t1 = Tensor::<f32>::from_vector(vec![5],(0..5).map(|i| i as f32).collect::<Vec<f32>>());
 	let t2 = Tensor::<f32>::from_vector(vec![5],(5..10).map(|i| i as f32).collect::<Vec<f32>>());
 	let t3 = Tensor::<f32>::from_vector(vec![],vec![3.0])*&t2;
 	assert_eq!(t3, &t2+&t2+&t2);
@@ -560,12 +560,15 @@ fn tensor_clip_test() {
 fn tensor_iter_test() {
 	let mut rng = rand_xorshift::XorShiftRng::from_entropy();
 	let uniform_dist = Uniform::new(-1.0,1.0);
-	let v = (0..100*2).map(|_| uniform_dist.sampe(&mut rng))
+	let v = (0..100*2).map(|_| uniform_dist.sample(&mut rng))
 		.collect::<Vec<f64>>();
 	let t1 = Tensor::<f64>::from_vector(vec![100,2], v);
+	let mut counter = 0;
 
 	for s in t1.iter() {
-		println!("{}", s)
+		println!("{}", s);
+		assert_eq!(s,t1.subtensor(counter));
+		counter += 1;
 	}
 
 }
