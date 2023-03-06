@@ -2,7 +2,7 @@ pub mod vector;
 pub mod matrix;
 pub mod tensor;
 
-pub use crate::tensor::tensor_base::{Tensor};
+pub use crate::tensor::tensor_base::{Tensor,SubTensor};
 
 #[cfg(test)]
 mod tests {
