@@ -65,4 +65,18 @@ where T:num::Num+Clone+Copy {
 		Tensor::<T>::from_vector(shape,self.buffer().to_vec())
 	}
 
+	pub fn selector(&self, selector:&[usize]) -> Tensor<T> {
+		let shape = {
+			let mut s = self.shape().to_vec();
+			s[0] = selector.len();
+			s
+		};
+		let mut v:Vec<T> = vec!();
+		for &s in selector.iter() {
+			let st = self.subtensor(s);
+			v.extend_from_slice(st.buffer());
+		}
+		Tensor::<T>::from_vector(shape,v)
+	}
+
 }
