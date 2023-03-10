@@ -4,7 +4,7 @@ use num;
 use crate::tensor::tensor_base::Tensor;
 
 impl<T> Tensor<T>
-where T:num::Num+Clone+Copy {
+where T:num::Num + Clone + Copy {
 
 	pub fn reshape(&self, shape:&[usize]) -> Tensor<T> {
 		assert_eq!(self.buffer().len(), shape.iter().fold(1,|prod,d| { prod * (*d) }));
@@ -67,9 +67,21 @@ where T:num::Num+Clone+Copy {
 
 	pub fn selector(&self, selector:&[usize]) -> Tensor<T> {
 		let shape = {
-			let mut s = self.shape().to_vec();
-			s[0] = selector.len();
-			s
+			if self.shape().len() == 2 {
+				let mut s = self.shape().to_vec();
+				if s[0] == 1 {
+					s[1] = selector.len();
+				}
+				else {
+					s[0] = selector.len();
+				}
+				s
+			}
+			else {
+				let mut s = self.shape().to_vec();
+				s[0] = selector.len();
+				s
+			}
 		};
 		let mut v:Vec<T> = vec!();
 		for &s in selector.iter() {
