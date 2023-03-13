@@ -127,6 +127,11 @@ impl<T> Tensor<T>
 		Self::position_to_index_inner(0, self.shape(), position)
 	}
 
+	pub fn replace(&mut self, shape:&[usize], elements:&[T]) {
+		self.shape = shape.to_vec();
+		self.v = elements.to_owned().into_boxed_slice();
+	}
+
 	pub fn replace_element(&mut self, v:Vec<T>) {
 		self.v = v.into_boxed_slice();
 	}
@@ -137,7 +142,8 @@ impl<T> Tensor<T>
 
 }
 
-impl<T:Clone> Tensor<T> {
+impl<T> Tensor<T>
+where T:Clone {
     pub fn buffer(&self) -> &[T] {
 		&self.v
     }
