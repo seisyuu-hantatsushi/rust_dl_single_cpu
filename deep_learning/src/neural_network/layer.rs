@@ -77,7 +77,7 @@ where T:NeuronPrimType<T> {
 					borrowed_l.w = Some(Rc::clone(&wn));
 					let output = if borrowed_l.enable_bias {
 						let label = borrowed_l.name.clone() + "_b";
-						let b = self.create_neuron(&label,Tensor::<T>::zero(&[1,1]));
+						let b = self.create_neuron(&label,Tensor::<T>::zero(&[1,borrowed_l.out_size]));
 						let output = self.affine(Rc::clone(&inputs[0]), wn, Some(Rc::clone(&b)));
 						borrowed_l.b = Some(b);
 						output
