@@ -114,6 +114,7 @@ where T:NeuronPrimType<T> {
 		assert_eq!(w_shape.len(),2);
 		assert_eq!(x_shape[1], w_shape[0]);
 		let result_shape = vec![x_shape[0],w_shape[1]];
+		//println!("{:?}*{:?} + {:?} -> {:?}", x_shape, w_shape, inputs[2].shape(), result_shape);
 		let b = inputs[2].broadcast(&result_shape);
 		let y = Tensor::<T>::affine(inputs[0], inputs[1], &b);
 		vec![y]
