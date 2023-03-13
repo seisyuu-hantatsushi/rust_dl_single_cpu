@@ -178,7 +178,8 @@ fn sce_test() -> Result<(),Box<dyn std::error::Error>> {
 		}
 
 		nn.backward_propagating(0)?;
-		let numgrad = numerical_grad(&|x:&Tensor<f64>| { softmax_cross_entropy(x, t.borrow().ref_signal()) }, x.borrow().ref_signal(), 1.0e-4);
+		let numgrad = numerical_grad(&|x:&Tensor<f64>| { softmax_cross_entropy(x, t.borrow().ref_signal()) },
+									 x.borrow().ref_signal(), 1.0e-4);
 		let borrowed_x = x.borrow();
 		if let Some(ref gx) = borrowed_x.ref_grad() {
 			let result =
