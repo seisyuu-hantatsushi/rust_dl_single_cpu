@@ -60,6 +60,16 @@ impl<T> ops::Add for &Tensor<T>
     }
 }
 
+impl<T> ops::AddAssign<Tensor<T>> for Tensor<T>
+where T:num::Num + Copy {
+    fn add_assign(&mut self, rhs: Self) {
+	assert_eq!(self.shape(), rhs.shape());
+	let v = self.buffer().iter().zip(rhs.buffer().iter()).map(|(&l,&r)| l + r)
+	    .collect::<Vec<T>>();
+	self.replace_element(v);
+    }
+}
+
 impl<T> Tensor<T>
 where T:num::Num + Copy + std::fmt::Display {
 
@@ -75,6 +85,7 @@ where T:num::Num + Copy + std::fmt::Display {
 	Tensor::from_vector(self.shape().to_vec(), v)
    }
 }
+
 
 /* T = &ST + &ST */
 impl<'a,T>ops::Add for &SubTensor<'a,T>
