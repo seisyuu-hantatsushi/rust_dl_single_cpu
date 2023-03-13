@@ -127,9 +127,11 @@ where T:NeuronPrimType<T> {
 												 num::one::<T>()/num::FromPrimitive::from_usize(x_shape[0]).unwrap());
 		let scale_n = nn_neuron_constant(&("1/".to_string()+&x_shape[0].to_string()), scale_t);
 		outputs.push(Rc::clone(&scale_n));
+		outputs.push(Rc::clone(&grads[0]));
 		let (sn,gy) = Self::hadamard_product(Rc::clone(&grads[0]), scale_n);
 		sns.push(sn);
 		outputs.push(Rc::clone(&gy));
+		outputs.push(Rc::clone(&inputs[0]));
 		let (sn,y) = Self::softmax(Rc::clone(&inputs[0]), 1);
 		sns.push(sn);
 		outputs.push(Rc::clone(&y));
