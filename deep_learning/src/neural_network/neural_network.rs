@@ -5,8 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::{BTreeSet,HashMap};
 
-use rand::{Rng,SeedableRng};
-use rand_distr::{Normal,Distribution};
+use rand::SeedableRng;
 use rand_pcg::Pcg64;
 
 use linear_transform::tensor::Tensor;
@@ -73,10 +72,6 @@ where T:NeuronPrimType<T> {
 		for g in self.generation_table.iter() {
 			for node in g.iter() {
 				let _ = node.borrow().forward();
-				/*
-				for output in outputs.iter() {
-					println!("{:p} {}", Rc::as_ptr(&output), output.borrow())
-				}*/
 			}
 		}
 		if let Some(ref gs) = self.generation_table.last() {
@@ -397,6 +392,20 @@ where T:NeuronPrimType<T> {
 			vec!()
 		};
 		sns
+	}
+
+	pub fn get_neuron_by_name(&mut self, order:usize, name:&str) -> Option<NNNeuron<T>> {
+		if order < self.cg_order.len() {
+			for nn in self.cg_order[order].neurons.values() {
+				if nn.borrow().name() == name {
+					return Some(Rc::clone(nn));
+				}
+			}
+			None
+		}
+		else {
+			None
+		}
 	}
 
 	pub fn get_rng(&mut self) -> &mut Pcg64 { &mut self.rng }

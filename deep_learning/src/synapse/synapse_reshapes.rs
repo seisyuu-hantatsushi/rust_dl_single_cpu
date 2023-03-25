@@ -419,4 +419,97 @@ where T:NeuronPrimType<T> {
 		rsn.borrow().forward();
 		(rsn, output)
 	}
+
+	fn onehot_forward(inputs: Vec<&Tensor<T>>, opt: &Option<SynapseOption<T>>) -> Vec<Tensor<T>> {
+		let mut v:Vec<T> = vec!();
+		let &num_of_label = if let Some(ref o) = opt {
+			match o {
+				SynapseOption::OneShot((n, _)) => {
+					n
+				},
+				_ => panic!("invalid option")
+			}
+		}
+		else {
+			panic!("no option")
+		};
+
+		let id = Tensor::<T>::identity(num_of_label);
+		let t = if inputs[0].shape().len() == 1 {
+			panic!("invalid shape");
+		}
+		else if inputs[0].shape().len() == 2 {
+
+			if inputs[0].shape()[0] != 1 && inputs[0].shape()[1] != 1 {
+				panic!("invalid shape");
+			}
+
+			let label:Vec<usize> =
+				inputs[0].buffer().iter().map(|e| e.to_usize().unwrap()).collect();
+			for &l in label.iter() {
+				v.extend(id.subtensor(l).buffer().to_vec());
+			}
+			Tensor::<T>::from_vector(vec![label.len(),num_of_label], v)
+		}
+		else {
+			panic!("invalid shape");
+		};
+
+		vec![t]
+	}
+
+	fn onehot_backward(inputs: &Vec<NNNeuron<T>>,
+					   grads:  &Vec<NNNeuron<T>>,
+					   opt: &Option<SynapseOption<T>>)
+					   -> (Vec<NNSynapseNode<T>>, Vec<NNNeuron<T>>) {
+		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+
+		let input_shape = if let Some(ref o) = opt {
+			match o {
+				SynapseOption::OneShot((_, s)) => {
+					s
+				},
+				_ => panic!("invalid option")
+			}
+		}
+		else {
+			panic!("no option")
+		};
+
+		if !inputs[0].borrow().is_constant() {
+			let (sn, output) = Self::sum_to(Rc::clone(&grads[0]), input_shape);
+			sns.push(sn);
+			outputs.push(Rc::clone(&output));
+			let mut n = inputs[0].borrow_mut();
+			if let Some(ref g) = n.ref_grad() {
+				let (sn,output) = Self::add(Rc::clone(&g), output);
+				sns.push(sn);
+				outputs.push(Rc::clone(&output));
+				n.set_grad(output);
+			}
+			else {
+				n.set_grad(output);
+			}
+		}
+
+		(sns, outputs)
+	}
+
+	pub fn onehot(x:NNNeuron<T>, size:usize) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		let label = "onehot";
+		let output = nn_neuron_new(&label, Tensor::<T>::zero(&[size, size]));
+		let opt = SynapseOption::OneShot((size,x.borrow().shape().to_vec()));
+		let s = Synapse::<T>::new_with_option(Self::onehot_forward,
+											  Self::onehot_backward,
+											  opt);
+		let sn = SynapseNode::<T>::new(&label,
+									   vec![Rc::clone(&x)],
+									   vec![Rc::clone(&output)],
+									   s);
+		let rsn = Rc::new(RefCell::new(sn));
+		output.borrow_mut().set_generator(Rc::clone(&rsn));
+		rsn.borrow().forward();
+		(rsn, output)
+	}
 }

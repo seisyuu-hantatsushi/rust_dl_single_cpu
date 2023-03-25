@@ -25,7 +25,7 @@ where T:num::Float + num::FromPrimitive + num::pow::Pow<T, Output = T> + Clone +
 
 		let src_shape = inputs[0].shape();
 		let max = inputs[0].max_in_axis(*axis).broadcast(src_shape);
-		//println!("src {}", inputs[0]);
+		//println!("softmax forward input {}",inputs[0]);
 		//println!("max {}", max);
 		let y = (inputs[0]-max).exp();
 		//println!("y {}", y);

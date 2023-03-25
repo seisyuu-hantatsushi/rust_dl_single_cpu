@@ -96,9 +96,11 @@ where T:NeuronPrimType<T> {
 		(rsn, output)
 	}
 
-
 	fn softmax_cross_entropy_error_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
 										   -> Vec<Tensor<T>> {
+		//println!("sce input:{}", inputs[0]);
+		//println!("sce input:{}", inputs[1]);
+
 		let orig_shape = inputs[0].shape().to_vec();
 		let m = inputs[0].max_in_axis(1);
 		let y = inputs[0] - m.broadcast(&orig_shape);
@@ -126,6 +128,7 @@ where T:NeuronPrimType<T> {
 		let scale_t = Tensor::<T>::new_set_value(grads[0].borrow().shape(),
 												 num::one::<T>()/num::FromPrimitive::from_usize(x_shape[0]).unwrap());
 		let scale_n = nn_neuron_constant(&("1/".to_string()+&x_shape[0].to_string()), scale_t);
+
 		outputs.push(Rc::clone(&scale_n));
 		outputs.push(Rc::clone(&grads[0]));
 		let (sn,gy) = Self::hadamard_product(Rc::clone(&grads[0]), scale_n);
@@ -135,18 +138,10 @@ where T:NeuronPrimType<T> {
 		let (sn,y) = Self::softmax(Rc::clone(&inputs[0]), 1);
 		sns.push(sn);
 		outputs.push(Rc::clone(&y));
-		let onehot_t = {
-			let mut v:Vec<T> = vec!();
-			let id = Tensor::<T>::identity(x_shape[1]);
-			let label:Vec<usize> =
-				inputs[1].borrow().ref_signal().buffer().iter().map(|e| e.to_usize().unwrap()).collect();
-			for l in label.iter() {
-				//println!("selector {} {}", l, id.subtensor(*l));
-				v.extend(id.subtensor(*l).buffer().to_vec());
-			}
-			Tensor::<T>::from_vector(vec![label.len(), id.shape()[1]], v)
-		};
-		let onehot_n = nn_neuron_constant("selector", onehot_t);
+		let (sn,onehot_n) = Self::onehot(Rc::clone(&inputs[1]),x_shape[1]);
+		sns.push(sn);
+		outputs.push(Rc::clone(&inputs[1]));
+		onehot_n.borrow_mut().rename("selector");
 		outputs.push(Rc::clone(&onehot_n));
 		let (sn,y) = Self::sub(y,onehot_n);
 		sns.push(sn);

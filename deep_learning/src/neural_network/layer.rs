@@ -72,7 +72,7 @@ where T:NeuronPrimType<T> {
 						let rate = (num::one::<T>()/l).sqrt();
 						w * rate
 					}).collect();
-					let label = borrowed_l.name.clone() + "_w";
+					let label = borrowed_l.name.clone() + "_W";
 					let wn = self.create_neuron(&label, Tensor::<T>::from_vector(w_shape,ws));
 					borrowed_l.w = Some(Rc::clone(&wn));
 					let output = if borrowed_l.enable_bias {
@@ -80,6 +80,49 @@ where T:NeuronPrimType<T> {
 						let b = self.create_neuron(&label,Tensor::<T>::zero(&[1,borrowed_l.out_size]));
 						let output = self.affine(Rc::clone(&inputs[0]), wn, Some(Rc::clone(&b)));
 						borrowed_l.b = Some(b);
+						output
+					}
+					else {
+						self.affine(Rc::clone(&inputs[0]), wn, None)
+					};
+					borrowed_l.output = Some(Rc::clone(&output));
+					ns.push(output);
+				}
+				else {
+					panic!("already set input variable");
+				}
+				ns
+			}
+		}
+	}
+
+	pub fn layer_set_weights_and_inputs(&mut self, nnlayer:&mut NNLayer<T>,
+										weights:(Tensor<T>,Option<Tensor<T>>),
+										inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+		let layer = Rc::get_mut(nnlayer).unwrap_or_else(|| panic!("not safe to mutate"));
+		let (w,bias) = weights;
+		match layer {
+			Layer::<T>::Linear(l) => {
+				let mut ns = vec!();
+				let mut borrowed_l = l.borrow_mut();
+				if let None = borrowed_l.w {
+					let in_size = inputs[0].borrow().shape()[1];
+					let label = borrowed_l.name.clone() + "_W";
+					let w_shape = vec![in_size, borrowed_l.out_size];
+					assert_eq!(w_shape,w.shape());
+					//println!("l w {}",w);
+					let wn = self.create_neuron(&label, w);
+					borrowed_l.w = Some(Rc::clone(&wn));
+					let output = if borrowed_l.enable_bias {
+						let label = borrowed_l.name.clone() + "_b";
+						let nb = if let Some(bias) = bias {
+							self.create_neuron(&label, bias)
+						}
+						else {
+							self.create_neuron(&label,Tensor::<T>::zero(&[1,borrowed_l.out_size]))
+						};
+						let output = self.affine(Rc::clone(&inputs[0]), wn, Some(Rc::clone(&nb)));
+						borrowed_l.b = Some(nb);
 						output
 					}
 					else {

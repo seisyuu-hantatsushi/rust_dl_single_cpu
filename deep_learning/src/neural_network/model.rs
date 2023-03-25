@@ -6,10 +6,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::HashMap;
 
-use crate::neural_network::NeuralNetwork;
-use crate::neural_network::layer::NNLayer;
+use linear_transform::tensor::Tensor;
 use crate::neuron::{NeuronPrimType,Neuron,NNNeuron};
 use crate::synapse::SynapseNode;
+use crate::neural_network::NeuralNetwork;
+use crate::neural_network::layer::NNLayer;
 
 pub struct TwoLayerNet<T>
 where T: NeuronPrimType<T> {
@@ -109,6 +110,26 @@ where T:NeuronPrimType<T> {
 		ll2_outputs
 	}
 
+	fn two_layer_net_set_weights_and_inputs(&mut self,
+											sns_map:&mut NNSynapseNodeHashMap<T>,
+											model:&mut TwoLayerNet<T>,
+											weights: &[(Tensor<T>,Option<Tensor<T>>)],
+											inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+
+		let ll1_outputs = self.layer_set_weights_and_inputs(&mut model.ll1, weights[0].clone(), inputs);
+		let sigmoid     = self.sigmoid(Rc::clone(&ll1_outputs[0]));
+		let ll2_outputs = self.layer_set_weights_and_inputs(&mut model.ll2, weights[1].clone(), vec![Rc::clone(&sigmoid)]);
+
+		for nn in vec![ll1_outputs, vec![sigmoid], ll2_outputs.clone()].concat().iter() {
+			let sns = self.get_linked_synapses(0, nn);
+			for sn in sns.iter() {
+				sns_map.insert(Rc::as_ptr(sn),Rc::clone(sn));
+			}
+		}
+
+		ll2_outputs
+	}
+
 	fn mlp_set_inputs(&mut self,
 					  sns_map:&mut NNSynapseNodeHashMap<T>,
 					  model:&mut MLP<T>,
@@ -137,6 +158,43 @@ where T:NeuronPrimType<T> {
 		outputs
 	}
 
+	fn mlp_net_set_weights_and_inputs(&mut self,
+									  sns_map:&mut NNSynapseNodeHashMap<T>,
+									  model:&mut MLP<T>,
+									  weights: &[(Tensor<T>,Option<Tensor<T>>)],
+									  inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+		let mut layer_inputs:Vec<NNNeuron<T>> = inputs;
+		let num_of_layers = model.lls.len();
+		let mut layer_outputs:Vec<Vec<NNNeuron<T>>> = vec!();
+
+		for i in 0..(num_of_layers-1) {
+			let l_outputs = self.layer_set_weights_and_inputs(&mut model.lls[i],
+															  weights[i].clone(),
+															  layer_inputs);
+			let label = "affine_".to_string() + &i.to_string();
+			l_outputs[0].borrow_mut().rename(&label);
+			layer_inputs = vec![self.sigmoid(Rc::clone(&l_outputs[0]))];
+			layer_outputs.push(l_outputs);
+			layer_outputs.push(layer_inputs.clone());
+		}
+
+		let outputs = self.layer_set_weights_and_inputs(&mut model.lls[num_of_layers-1],
+														weights[num_of_layers-1].clone(),
+														layer_inputs);
+		let label = "affine_".to_string() + &(num_of_layers-1).to_string();
+		outputs[0].borrow_mut().rename(&label);
+		layer_outputs.push(outputs.clone());
+
+		for nn in layer_outputs.concat().iter() {
+			let sns = self.get_linked_synapses(0, nn);
+			for sn in sns.iter() {
+				sns_map.insert(Rc::as_ptr(sn),Rc::clone(sn));
+			}
+		}
+
+		outputs
+	}
+
 	pub fn model_set_inputs(&mut self,
 							nnmodel:&mut NNModel<T>,
 							inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
@@ -151,6 +209,20 @@ where T:NeuronPrimType<T> {
 		}
 	}
 
+	pub fn model_set_weight_and_inputs(&mut self,
+									   nnmodel:&mut NNModel<T>,
+									   weights:&[(Tensor<T>,Option<Tensor<T>>)],
+									   inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
+		let model = Rc::get_mut(nnmodel).unwrap_or_else(|| panic!("not safe to mutate"));
+		match &model.model {
+			EModel::TwoLayerNet(m) => {
+				self.two_layer_net_set_weights_and_inputs(&mut model.synapse_nodes, &mut m.borrow_mut(), weights, inputs)
+			},
+			EModel::MLP(m) => {
+				self.mlp_net_set_weights_and_inputs(&mut model.synapse_nodes, &mut m.borrow_mut(), weights, inputs)
+			}
+		}
+	}
 }
 
 impl<T> Model<T>

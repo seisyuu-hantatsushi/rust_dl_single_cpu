@@ -14,7 +14,8 @@ where T:NeuronPrimType<T> {
 	Slice((usize, Vec<usize>)),
 	SliceGrad(usize),
 	Softmax(usize),
-	Scale(T)
+	Scale(T),
+	OneShot((usize,Vec<usize>))
 }
 
 pub type ForwardProp<T> = fn (inputs: Vec<&Tensor<T>>, synapse_opt: &Option<SynapseOption<T>>)
@@ -464,10 +465,27 @@ where T:NeuronPrimType<T> {
 	}
 
 	pub fn forward(&self) -> Vec<NNNeuron<T>> {
-		let inputs_holder = self.inputs.iter().map(|n| n.borrow()).collect::<Vec<Ref<'_,Neuron<T>>>>();
-		let inputs = inputs_holder.iter().map(|n| n.ref_signal()).collect::<Vec<&Tensor<T>>>();
-		let outputs = (self.synapse.forward)(inputs, self.synapse.ref_option());
-		self.outputs.iter().zip(outputs.into_iter()).map(|(n,t)| {n.borrow_mut().assign(t); Rc::clone(n)}).collect()
+
+		let outputs:Vec<NNNeuron<T>> = {
+			let inputs_holder = self.inputs.iter().map(|n| n.borrow()).collect::<Vec<Ref<'_,Neuron<T>>>>();
+			let inputs = inputs_holder.iter().map(|n| n.ref_signal()).collect::<Vec<&Tensor<T>>>();
+			let outputs = (self.synapse.forward)(inputs, self.synapse.ref_option());
+			self.outputs.iter().zip(outputs.into_iter()).map(|(n,t)| {
+				n.borrow_mut().assign(t); Rc::clone(n)
+			}).collect()
+		};
+/*
+		println!("synapse name: {}", self.name);
+		for input in self.inputs.iter() {
+			println!("input node:{:p}", Rc::as_ptr(&input));
+			println!("{:p} {}", Rc::as_ptr(&input), input.borrow());
+		}
+		for output in outputs.iter() {
+			println!("output node:{:p}", Rc::as_ptr(&output));
+			println!("{:p} {}", Rc::as_ptr(&output), output.borrow());
+		}
+*/
+		outputs
     }
 
     pub fn make_diff_node(&self) -> (Vec<NNSynapseNode<T>>, Vec<NNNeuron<T>>) {
