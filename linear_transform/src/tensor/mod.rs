@@ -1,4 +1,5 @@
 pub mod tensor_base;
+pub mod tensor_cast;
 pub mod tensor_iter;
 pub mod tensor_reshapes;
 pub mod tensor_add;
