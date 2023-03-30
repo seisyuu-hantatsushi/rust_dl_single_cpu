@@ -18,6 +18,18 @@ use num;
   T(v) = kT'(v1)  -> T = kT'. T,T' same Rank Tensor. k is scaler.
 */
 
+/*
+ Tensor axis order is same as numpy axis.
+   axis = 0
+ shape = [2]
+   axis = 1,0
+ shape = [2,3]
+   axis = 2,1,0
+ shape = [4,2,3]
+   axis = 3,2,1,0
+ shape = [2,4,2,3]
+*/
+
 #[derive(Debug, Clone)]
 pub struct Tensor<T> where T: Clone {
     shape: Vec<usize>,

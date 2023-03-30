@@ -9,7 +9,7 @@ enum Operator {
 }
 
 impl<T> Tensor<T>
-where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
+where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd {
 
 	fn compare_tuple(op: Operator, p:(&T,&T)) -> T {
 		let (&m,&e) = p;
@@ -82,7 +82,8 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 		}
 		else {
 			if dst_shape[0] == 1 && dst_shape[1] == 1 {
-				let s = v.into_iter().fold(num::zero(),|accum, e| accum+*e);
+				let s = v.into_iter().fold(num::zero::<T>(),|accum, e| accum+*e);
+				panic!("need to impl");
 				Tensor::<T>::from_array(&[1,1], &[s])
 			}
 			else if dst_shape[0] == 1 {
@@ -130,7 +131,7 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 			else {
 				panic!("invalid source shape.");
 			};
-			Tensor::<T>::from_vector(vec!(), vec![max])
+			Tensor::<T>::from_vector(vec![1], vec![max])
 		}
 		else {
 			let dst_shape = {
@@ -149,4 +150,74 @@ where T:num::Num+Clone+Copy+std::cmp::PartialOrd {
 	pub fn min_in_axis(&self, axis:usize) -> Tensor<T> {
 		self.max_min_in_axis(axis, Operator::MIN)
     }
+
+	fn max_min_index_subtensor(v:&[T], src_shape:&[usize], axis:usize, op:Operator) -> Tensor<T> {
+		if axis == 0 {
+			let compare = |a:&T, b:&T| -> bool {
+				match op {
+					Operator::MAX => a < b,
+					Operator::MIN => a > b
+				}
+			};
+			let element_size = src_shape[1..].iter().fold(1,|p,&s| p*s);
+			let mut elements:Vec<(usize,T)> = Vec::with_capacity(element_size);
+			let chunks = v.chunks(element_size);
+			for (i,chunk) in chunks.enumerate() {
+				if i == 0 {
+					for &v in chunk {
+						elements.push((0,v))
+					}
+				}
+				else {
+					for (j,&v) in chunk.iter().enumerate() {
+						if compare(&(elements[j].1), &v) {
+							elements[j] = (i,v)
+						}
+					}
+				}
+			}
+			let result_v:Vec<T> = elements.iter().map(|(i,_)| num::FromPrimitive::from_usize(*i).unwrap() ).collect();
+			return Tensor::from_vector(src_shape[1..].to_vec(),result_v);
+		}
+		else {
+			let mut tv:Vec<Tensor<T>> = vec!();
+			let chunk_size = src_shape[1..].iter().fold(1,|p,&s| p*s);
+			for subtensor in v.chunks(chunk_size){
+				tv.push(Self::max_min_index_subtensor(subtensor, &src_shape[1..], axis-1, op));
+			}
+			return Tensor::bind(tv);
+		}
+		Tensor::zero(&[1,1])
+	}
+
+	fn arg_max_min(&self, axis:usize, op:Operator) -> Tensor<T> {
+		if self.shape().len() == 0 {
+			self.clone()
+		}
+		else if self.shape().len() == 1 {
+			let mut current_pos:usize = 0;
+			let mut current_val = self.buffer()[0];
+			let compare = |a:&T, b:&T| -> bool {
+					match op {
+						Operator::MAX => a < b,
+						Operator::MIN => a > b
+					}
+				};
+			for (i,val) in self.buffer().iter().enumerate() {
+				if compare(&current_val, val) {
+					current_pos = i;
+					current_val = *val;
+				}
+			}
+			Tensor::<T>::from_vector(vec![1], vec![num::FromPrimitive::from_usize(current_pos).unwrap()])
+		}
+		else {
+			Self::max_min_index_subtensor(self.buffer(), self.shape(), axis, op)
+		}
+	}
+
+	pub fn argmax(&self, axis:usize) -> Tensor<T> {
+		assert!(axis < self.shape().len());
+		self.arg_max_min(axis, Operator::MAX)
+	}
 }

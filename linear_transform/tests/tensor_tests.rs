@@ -597,3 +597,42 @@ fn tensor_selector_test() {
 	}
 
 }
+
+#[test]
+fn tensor_argmax_test(){
+	let x1 = Tensor::<f64>::from_vector(vec![2,2,2,3],
+										vec![13.0, 5.0, 6.0,
+											  1.0, 2.0, 3.0,
+											  7.0, 8.0, 9.0,
+											 10.0,11.0,12.0,
+											  4.0,14.0,15.0,
+											 16.0,17.0,18.0,
+											 19.0,20.0,21.0,
+											 22.0,23.0,24.0]);
+	println!("{}",x1);
+	let x_argmax = x1.argmax(0);
+	let x_argmax_result = Tensor::<f64>::from_vector(vec![2,2,3],vec![0.0,1.0,1.0,
+																	  1.0,1.0,1.0,
+																	  1.0,1.0,1.0,
+																	  1.0,1.0,1.0]);
+	assert_eq!(x_argmax, x_argmax_result);
+	let x_argmax = x1.argmax(1);
+	let x_argmax_result = Tensor::<f64>::from_vector(vec![2,2,3],vec![0.0,1.0,1.0,
+																	  1.0,1.0,1.0,
+																	  1.0,1.0,1.0,
+																	  1.0,1.0,1.0]);
+	assert_eq!(x_argmax, x_argmax_result);
+	let x_argmax = x1.argmax(2);
+	let x_argmax_result = Tensor::<f64>::from_vector(vec![2,2,3],vec![0.0,0.0,0.0,
+																	  1.0,1.0,1.0,
+																	  1.0,1.0,1.0,
+																	  1.0,1.0,1.0]);
+	assert_eq!(x_argmax, x_argmax_result);
+	let x_argmax = x1.argmax(3);
+	let x_argmax_result = Tensor::<f64>::from_vector(vec![2,2,2],vec![0.0,2.0,
+																	  2.0,2.0,
+																	  2.0,2.0,
+																	  2.0,2.0]);
+	assert_eq!(x_argmax, x_argmax_result);
+	()
+}

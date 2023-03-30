@@ -91,4 +91,16 @@ where T:num::Num + Clone + Copy {
 		Tensor::<T>::from_vector(shape,v)
 	}
 
+	pub fn bind(ts:Vec<Tensor<T>>) -> Tensor<T>
+	where T:num::Num + Clone + Copy {
+		let mut v:Vec<T> = vec!();
+		for t in ts.iter() {
+			v.extend(t.buffer());
+		}
+		let mut new_shape:Vec<usize> = vec!();
+		new_shape.push(ts.len());
+		new_shape.extend(ts[0].shape().to_vec());
+		Tensor::from_vector(new_shape, v)
+	}
+
 }
