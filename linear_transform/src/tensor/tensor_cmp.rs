@@ -83,7 +83,6 @@ where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd {
 		else {
 			if dst_shape[0] == 1 && dst_shape[1] == 1 {
 				let s = v.into_iter().fold(num::zero::<T>(),|accum, e| accum+*e);
-				panic!("need to impl");
 				Tensor::<T>::from_array(&[1,1], &[s])
 			}
 			else if dst_shape[0] == 1 {
