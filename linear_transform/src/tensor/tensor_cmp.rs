@@ -186,7 +186,6 @@ where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd {
 			}
 			return Tensor::bind(tv);
 		}
-		Tensor::zero(&[1,1])
 	}
 
 	fn arg_max_min(&self, axis:usize, op:Operator) -> Tensor<T> {
