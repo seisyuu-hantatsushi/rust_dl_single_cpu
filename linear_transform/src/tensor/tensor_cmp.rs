@@ -9,7 +9,7 @@ enum Operator {
 }
 
 impl<T> Tensor<T>
-where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd {
+where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd+std::fmt::Display {
 
 	fn compare_tuple(op: Operator, p:(&T,&T)) -> T {
 		let (&m,&e) = p;
@@ -182,7 +182,8 @@ where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd {
 			let mut tv:Vec<Tensor<T>> = vec!();
 			let chunk_size = src_shape[1..].iter().fold(1,|p,&s| p*s);
 			for subtensor in v.chunks(chunk_size){
-				tv.push(Self::max_min_index_subtensor(subtensor, &src_shape[1..], axis-1, op));
+				let t = Self::max_min_index_subtensor(subtensor, &src_shape[1..], axis-1, op);
+				tv.push(t);
 			}
 			return Tensor::bind(tv);
 		}
