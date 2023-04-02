@@ -636,3 +636,21 @@ fn tensor_argmax_test(){
 	assert_eq!(x_argmax, x_argmax_result);
 	()
 }
+
+#[test]
+fn tensor_relu_test() {
+	let mut rng = rand_xorshift::XorShiftRng::from_entropy();
+	let uniform_dist = Uniform::new(-1.0,1.0);
+	let t = Tensor::<f64>::from_vector(
+		vec![10,6,5],
+		(0..10*6*5).map(|_|
+						uniform_dist.sample(&mut rng)
+		).collect::<Vec<f64>>());
+	let relu = t.relu();
+	assert_eq!(relu.shape(),t.shape());
+	for &v in relu.buffer().iter() {
+		assert!(v >= 0.0);
+	}
+	println!("relu {}",relu);
+	()
+}

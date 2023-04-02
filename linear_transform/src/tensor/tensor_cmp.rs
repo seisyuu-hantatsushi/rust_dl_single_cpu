@@ -219,4 +219,19 @@ where T:num::Num+num::FromPrimitive+Clone+Copy+std::cmp::PartialOrd+std::fmt::Di
 		assert!(axis < self.shape().len());
 		self.arg_max_min(axis, Operator::MAX)
 	}
+
+	pub fn max(ts:Vec<&Tensor<T>>) -> Tensor<T> {
+		let mut tmax = ts[0].buffer().to_vec();
+		for t in ts[1..].iter() {
+			tmax = tmax.iter().zip(t.buffer().iter())
+				.map(|(&l,&r)| { if l > r { l } else { r } }).collect::<Vec<T>>();
+		}
+		Tensor::from_vector(ts[0].shape().to_vec(), tmax)
+	}
+
+	pub fn relu(&self) -> Tensor<T> {
+		let zero_t = Tensor::<T>::zero(self.shape());
+		Self::max(vec![self, &zero_t])
+	}
+
 }
