@@ -288,11 +288,11 @@ impl<T> LoaderSource<T> for MNIST where T:NeuronPrimType<T> {
 		Some((Tensor::from_vector(vec![batch_size,1],labels) ,Tensor::<T>::bind(image_tensors)))
 	}
 
-	fn get_num_of_image(&self) -> usize {
+	fn get_num_of_samples(&self) -> usize {
 		self.image_property.num_of_images
 	}
 
-	fn get_data_shape(&self) -> Vec<usize> {
+	fn get_sample_shape(&self) -> Vec<usize> {
 		vec![1, self.image_property.row*self.image_property.col]
 	}
 }

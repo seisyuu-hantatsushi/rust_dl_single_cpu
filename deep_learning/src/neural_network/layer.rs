@@ -57,13 +57,12 @@ where T:NeuronPrimType<T> {
 				let mut ns = vec!();
 				let mut borrowed_l = l.borrow_mut();
 				if let None = borrowed_l.w {
-					let mut rng = Pcg64::from_entropy();
 					let normal_dist = Normal::new(0.0,1.0).unwrap_or_else(|e| panic!("{} {}:{}", e.to_string(), file!(), line!()));
 					let in_size = inputs[0].borrow().shape()[1];
 					let w_shape = vec![in_size, borrowed_l.out_size];
 					let ws = (0..(w_shape[0]*w_shape[1])).map(|_| {
 						let w:T = num::FromPrimitive::from_f64(normal_dist
-															   .sample(&mut rng))
+															   .sample(&mut self.get_rng()))
 							.unwrap_or_else(||
 											panic!("failed to get normal dist value"));
 						let l:T = num::FromPrimitive::from_usize(in_size)

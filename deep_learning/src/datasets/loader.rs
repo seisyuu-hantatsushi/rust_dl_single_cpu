@@ -12,8 +12,8 @@ pub trait LoaderSource<T>
 where T:NeuronPrimType<T> {
     fn load_batch(&mut self, index:usize, batch_size:usize, permute_table:&Option<Vec<usize>>)
 				  -> Option<(Tensor<T>,Tensor<T>)>;
-    fn get_num_of_image(&self) -> usize;
-	fn get_data_shape(&self) -> Vec<usize>;
+    fn get_num_of_samples(&self) -> usize;
+	fn get_sample_shape(&self) -> Vec<usize>;
 }
 
 pub struct Loader<T> where T: NeuronPrimType<T> {
@@ -62,7 +62,7 @@ where T: NeuronPrimType<T> {
     pub fn get_batchs(&mut self) -> Batchs<T> {
 		self.permute_table = if let Some(ref mut rng) = self.rng
 		{
-			let mut permute_table = (0..self.data_inst.get_num_of_image()).collect::<Vec<usize>>();
+			let mut permute_table = (0..self.data_inst.get_num_of_samples()).collect::<Vec<usize>>();
 			permute_table.shuffle(rng);
 			Some(permute_table)
 		}
@@ -75,7 +75,11 @@ where T: NeuronPrimType<T> {
 		}
     }
 
-	pub fn get_data_shape(&mut self) -> Vec<usize> {
-		self.data_inst.get_data_shape()
+	pub fn get_num_of_samples(&self) -> usize {
+		self.data_inst.get_num_of_samples()
+	}
+
+	pub fn get_sample_shape(&mut self) -> Vec<usize> {
+		self.data_inst.get_sample_shape()
 	}
 }

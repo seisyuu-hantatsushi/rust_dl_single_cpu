@@ -8,14 +8,14 @@ use crate::neuron::{NeuronPrimType,NNNeuron,nn_neuron_new,nn_neuron_constant};
 impl<T> SynapseNode<T>
 where T:NeuronPrimType<T> {
 
-	pub fn sigmoid_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
-						  -> Vec<Tensor<T>> {
+	fn sigmoid_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
+					   -> Vec<Tensor<T>> {
 		vec![inputs[0].sigmoid()]
 	}
 
-	pub fn sigmoid_backward(inputs: &Vec<NNNeuron<T>>,
-							grads: &Vec<NNNeuron<T>>,
-							_opt: &Option<SynapseOption<T>>)
+	fn sigmoid_backward(inputs: &Vec<NNNeuron<T>>,
+						grads: &Vec<NNNeuron<T>>,
+						_opt: &Option<SynapseOption<T>>)
 					-> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
 		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
 		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
@@ -72,4 +72,58 @@ where T:NeuronPrimType<T> {
 		rsn.borrow().forward();
 		(rsn, output)
 	}
+
+	fn relu_forward(inputs: Vec<&Tensor<T>>, _opt: &Option<SynapseOption<T>>)
+					   -> Vec<Tensor<T>> {
+		vec![inputs[0].relu()]
+	}
+
+	fn relu_backward(inputs: &Vec<NNNeuron<T>>,
+					 grads: &Vec<NNNeuron<T>>,
+					 _opt: &Option<SynapseOption<T>>)
+					 -> (Vec<NNSynapseNode<T>>,Vec<NNNeuron<T>>) {
+		let mut sns:Vec<NNSynapseNode<T>> = Vec::new();
+		let mut outputs:Vec<NNNeuron<T>> = Vec::new();
+		let zero = nn_neuron_constant("0.0", Tensor::<T>::zero(&inputs[0].borrow().shape()));
+
+		if inputs[0].borrow().is_constant() {
+			return (sns, outputs);
+		}
+
+		outputs.push(Rc::clone(&zero));
+		outputs.push(Rc::clone(&inputs[0]));
+		let (sn, mask) = Self::max(vec![Rc::clone(&inputs[0]),zero]);
+		sns.push(sn);
+		outputs.push(Rc::clone(&mask));
+		outputs.push(Rc::clone(&grads[0]));
+		let (sn, gx) = Self::hadamard_product(Rc::clone(&grads[0]), mask);
+		sns.push(sn);
+		outputs.push(Rc::clone(&gx));
+		let mut n = inputs[0].borrow_mut();
+		if let Some(ref g) = n.ref_grad() {
+			let (sn, output) = Self::add(Rc::clone(&g), Rc::clone(&gx));
+			sns.push(sn);
+			output.borrow_mut().rename(&format!("{}+", g.borrow().name()));
+			outputs.push(Rc::clone(&output));
+			n.set_grad(output)
+		}
+		else {
+			n.set_grad(gx);
+		}
+
+		(sns,outputs)
+	}
+
+	pub fn relu(x:NNNeuron<T>) -> (NNSynapseNode<T>,NNNeuron<T>) {
+		let label = "relu";
+		let output = nn_neuron_new::<T>(&label, Tensor::<T>::zero(&[1,1]));
+		let s = Synapse::<T>::new(Self::relu_forward,
+								  Self::relu_backward);
+		let sn = SynapseNode::<T>::new(&label, vec![Rc::clone(&x)], vec![Rc::clone(&output)], s);
+		let rsn = Rc::new(RefCell::new(sn));
+		output.borrow_mut().set_generator(Rc::clone(&rsn));
+		rsn.borrow().forward();
+		(rsn, output)
+	}
+
 }

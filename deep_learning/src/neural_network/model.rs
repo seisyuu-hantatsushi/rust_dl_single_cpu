@@ -12,18 +12,19 @@ use crate::synapse::SynapseNode;
 use crate::neural_network::NeuralNetwork;
 use crate::neural_network::layer::NNLayer;
 
-pub struct TwoLayerNet<T>
-where T: NeuronPrimType<T> {
-	ll1: NNLayer<T>,
-	ll2: NNLayer<T>
-}
-
-pub type NNTwoLayerNet<T> = RefCell<TwoLayerNet<T>>;
-
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub enum MLPActivator {
 	Sigmoid,
 	ReLU,
 }
+
+pub struct TwoLayerNet<T>
+where T: NeuronPrimType<T> {
+	ll1: NNLayer<T>,
+	ll2: NNLayer<T>,
+}
+
+pub type NNTwoLayerNet<T> = RefCell<TwoLayerNet<T>>;
 
 pub struct MLP<T>
 where T: NeuronPrimType<T> {
@@ -97,10 +98,10 @@ where T:NeuronPrimType<T> {
 								inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
 
 		let ll1_outputs = self.layer_set_inputs(&mut model.ll1, inputs);
-		let sigmoid     = self.sigmoid(Rc::clone(&ll1_outputs[0]));
-		let ll2_outputs = self.layer_set_inputs(&mut model.ll2, vec![Rc::clone(&sigmoid)]);
+		let activetor   = self.sigmoid(Rc::clone(&ll1_outputs[0]));
+		let ll2_outputs = self.layer_set_inputs(&mut model.ll2, vec![Rc::clone(&activetor)]);
 
-		for nn in vec![ll1_outputs, vec![sigmoid], ll2_outputs.clone()].concat().iter() {
+		for nn in vec![ll1_outputs, vec![activetor], ll2_outputs.clone()].concat().iter() {
 			let sns = self.get_linked_synapses(0, nn);
 			for sn in sns.iter() {
 				sns_map.insert(Rc::as_ptr(sn),Rc::clone(sn));
@@ -117,10 +118,10 @@ where T:NeuronPrimType<T> {
 											inputs:Vec<NNNeuron<T>>) -> Vec<NNNeuron<T>> {
 
 		let ll1_outputs = self.layer_set_weights_and_inputs(&mut model.ll1, weights[0].clone(), inputs);
-		let sigmoid     = self.sigmoid(Rc::clone(&ll1_outputs[0]));
-		let ll2_outputs = self.layer_set_weights_and_inputs(&mut model.ll2, weights[1].clone(), vec![Rc::clone(&sigmoid)]);
+		let activetor     = self.sigmoid(Rc::clone(&ll1_outputs[0]));
+		let ll2_outputs = self.layer_set_weights_and_inputs(&mut model.ll2, weights[1].clone(), vec![Rc::clone(&activetor)]);
 
-		for nn in vec![ll1_outputs, vec![sigmoid], ll2_outputs.clone()].concat().iter() {
+		for nn in vec![ll1_outputs, vec![activetor], ll2_outputs.clone()].concat().iter() {
 			let sns = self.get_linked_synapses(0, nn);
 			for sn in sns.iter() {
 				sns_map.insert(Rc::as_ptr(sn),Rc::clone(sn));
@@ -140,7 +141,15 @@ where T:NeuronPrimType<T> {
 
 		for i in 0..(num_of_layers-1) {
 			let l_outputs = self.layer_set_inputs(&mut model.lls[i], layer_inputs);
-			layer_inputs = vec![self.sigmoid(Rc::clone(&l_outputs[0]))];
+			let activator = if model.activator == MLPActivator::ReLU
+			{
+				self.relu(Rc::clone(&l_outputs[0]))
+			}
+			else
+			{
+				self.sigmoid(Rc::clone(&l_outputs[0]))
+			};
+			layer_inputs = vec![activator];
 			layer_outputs.push(l_outputs);
 			layer_outputs.push(layer_inputs.clone());
 		}
