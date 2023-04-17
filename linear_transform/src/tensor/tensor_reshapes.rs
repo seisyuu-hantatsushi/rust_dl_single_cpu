@@ -4,7 +4,7 @@ use num;
 use crate::tensor::tensor_base::Tensor;
 
 impl<T> Tensor<T>
-where T:num::Num + Clone + Copy {
+where T:num::Num + Clone + Copy{
 
 	pub fn reshape(&self, shape:&[usize]) -> Tensor<T> {
 		assert_eq!(self.buffer().len(), shape.iter().fold(1,|prod,d| { prod * (*d) }));
@@ -97,9 +97,25 @@ where T:num::Num + Clone + Copy {
 		for t in ts.iter() {
 			v.extend(t.buffer());
 		}
-		let mut new_shape:Vec<usize> = vec!();
-		new_shape.push(ts.len());
-		new_shape.extend(ts[0].shape().to_vec());
+		let new_shape = if ts[0].shape().len() == 0 {
+			vec![ts.len(),1]
+		}
+		else if ts[0].shape().len() == 1 {
+			vec![ts.len(),ts[0].shape()[0]]
+		}
+		else {
+			if ts[0].shape()[0] == 1 {
+				let mut v = ts[0].shape().to_vec();
+				v[0] = ts.len();
+				v
+			}
+			else {
+				let mut v:Vec<usize> = vec!();
+				v.push(ts.len());
+				v.extend(ts[0].shape().to_vec());
+				v
+			}
+		};
 		Tensor::from_vector(new_shape, v)
 	}
 

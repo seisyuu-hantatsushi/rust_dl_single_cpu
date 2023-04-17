@@ -1,7 +1,5 @@
 /* -*- tab-width:4 -*- */
-use num;
-
-use std::convert::{From,Into};
+use std::convert::From;
 use crate::tensor::tensor_base::Tensor;
 
 impl From<Tensor<f64>> for Tensor<f32> {
