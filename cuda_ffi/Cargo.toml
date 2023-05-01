@@ -1,5 +1,5 @@
 [package]
-name = "cuda_ffi"
+name = "cudnn_ffi"
 version = "0.1.0"
 edition = "2021"
 
