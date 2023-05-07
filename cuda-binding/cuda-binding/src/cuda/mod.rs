@@ -4,6 +4,7 @@ pub mod context;
 pub mod module;
 pub mod memory;
 pub mod execute;
+pub mod occupancy;
 
 pub use cuda::initailize;
 
