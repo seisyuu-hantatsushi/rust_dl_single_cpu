@@ -6,8 +6,7 @@ extern crate cc;
 
 fn main() {
     let nvcc      = "/usr/local/cuda/bin/nvcc";
-    let cu_files:Vec<&str> = vec![ "kernels/tensor_add.cu",
-				    "kernels/hadamard_product.cu" ];
+    let cu_files:Vec<&str> = vec![ "kernels/kernel.cu" ];
     let mut ptx_files:Vec<String> = vec!();
     let sm_ver = "61";
 

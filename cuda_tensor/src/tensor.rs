@@ -1,6 +1,6 @@
 use crate::*;
 use cuda_binding::*;
-use std::{fmt, mem};
+use std::fmt;
 use std::cell::RefCell;
 use num;
 
@@ -86,3 +86,8 @@ pub fn sub<'a, T:num::Num>(x:&Tensor<'a, T>, y:&Tensor<'a, T>) -> Tensor<'a, T> 
 pub fn hadamard_product<'a, T:num::Num>(x:&Tensor<'a, T>, y:&Tensor<'a, T>) -> Tensor<'a, T> {
     x.context.hadamard_product(x, y).unwrap()
 }
+
+pub fn matmul<'a, T:num::Num>(x:&Tensor<'a, T>, y:&Tensor<'a, T>) -> Tensor<'a, T> {
+    x.context.matmul(x, y).unwrap()
+}
+

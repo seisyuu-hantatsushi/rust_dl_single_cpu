@@ -1,5 +1,4 @@
 use cuda_binding::*;
-use cuda_tensor::tensor::*;
 use rand::SeedableRng;
 use rand_distr::{Uniform,Distribution};
 use rand_pcg::Pcg64;
