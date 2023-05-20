@@ -114,7 +114,7 @@ __device__ void matrixMul(float *C, float *A, float *B, size_type wA,
 // C wrappers around our template kernel
 extern "C" __global__ void matrixMul_bs8_64bit(float *C, float *A, float *B,
                                                size_t wA, size_t wB) {
-  matrixMul<8, size_t>(C, A, B, wA, wB);
+   matrixMul<8, size_t>(C, A, B, wA, wB);
 }
 extern "C" __global__ void matrixMul_bs16_64bit(float *C, float *A, float *B,
                                                 size_t wA, size_t wB) {

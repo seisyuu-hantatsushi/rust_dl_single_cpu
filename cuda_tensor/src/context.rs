@@ -19,13 +19,35 @@ impl Context {
     fn load_mutmal_function(module: Rc<cuda::Module>) -> Result<(usize, cuda::Function), CUDAError> {
 	let mut blocksize:usize = 32;
 	let matrix_muls = [
-	    "matrixMul_bs32_64bit",
-	    "matrixMul_bs16_64bit",
+	    //"matrixMul_bs32_64bit",
+	    //"matrixMul_bs16_64bit",
 	    "matrixMul_bs8_64bit",
 	];
 
 	for matrix_mul in matrix_muls {
 	    let func     = module.get_function(matrix_mul)?;
+	    let (_gridsize, thread_per_block) =
+		cuda::occupancy::max_potential_blocksize(&func, 2*blocksize*blocksize*mem::size_of::<f32>(), 0)?;
+	    //println!("{},{}", _gridsize, thread_per_block);
+	    if blocksize*blocksize <= thread_per_block as usize {
+		return Ok((blocksize, func));
+	    }
+	    blocksize = blocksize/2;
+	};
+
+	Err(CUDAError::NotFound)
+    }
+
+    fn load_tensor_mutmal_function(module: Rc<cuda::Module>) -> Result<(usize, cuda::Function), CUDAError> {
+	let mut blocksize:usize = 32;
+	let matmuls = [
+	    "tensor_matmul_bs32",
+	    "tensor_matmul_bs16",
+	    "tensor_matmul_bs8",
+	];
+
+	for matmul in matmuls {
+	    let func     = module.get_function(matmul)?;
 	    let (_gridsize, thread_per_block) =
 		cuda::occupancy::max_potential_blocksize(&func, 2*blocksize*blocksize*mem::size_of::<f32>(), 0)?;
 	    //println!("{},{}", _gridsize, thread_per_block);
@@ -53,9 +75,10 @@ impl Context {
         let func     = module.get_function("hadamard_product")?;
 	let hadamard_func = (Rc::clone(&module), func);
 
-	let (blocksize, func) = Self::load_mutmal_function(Rc::clone(&module))?;
+	//let (blocksize, func) = Self::load_mutmal_function(Rc::clone(&module))?;
+	let (blocksize, func) = Self::load_tensor_mutmal_function(Rc::clone(&module))?;
 	let matmul_func = (module, func);
-	println!("matmul block size:{}", blocksize);
+	//println!("matmul block size:{}", blocksize);
 	//cuda::Context::pop()?;
         Ok(Context {
             dev_context,
@@ -169,15 +192,16 @@ impl Context {
 	let z_tensor = Tensor::<T>::new(self, &dst_shape)?;
 	{
 	    let block = (self.matmul_block_size, self.matmul_block_size, 1);
-	    let grid  = (x.shape()[0]/self.matmul_block_size, y.shape()[1]/self.matmul_block_size, 1);
-
+	    let grid  = (y.shape()[1]/self.matmul_block_size+1, x.shape()[0]/self.matmul_block_size+1, 1);
 	    let x_devmem = x.as_ref_devmem().borrow();
 	    let y_devmem = y.as_ref_devmem().borrow();
 	    let z_devmem = z_tensor.as_ref_devmem().borrow();
 
+	    //println!("{:?}", grid);
 	    let args = vec![ cuda::execute::LaunchKernelArg::DeviceMemory(&z_devmem),
 			     cuda::execute::LaunchKernelArg::DeviceMemory(&x_devmem),
 			     cuda::execute::LaunchKernelArg::DeviceMemory(&y_devmem),
+			     cuda::execute::LaunchKernelArg::Int(x.shape()[0] as i32),
 			     cuda::execute::LaunchKernelArg::Int(x.shape()[1] as i32),
 			     cuda::execute::LaunchKernelArg::Int(y.shape()[1] as i32)];
 	    let result = cuda::execute::launch_kernel(&self.matmul_func.1,

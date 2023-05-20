@@ -15,7 +15,7 @@ fn tensor_add() -> Result<(), CUDAError> {
 	return Err(result);
     }
 
-    let count_of_device = cuda::Device::getCount()?;
+    let count_of_device = cuda::Device::get_count()?;
     if count_of_device < 1 {
 	println!("unable to initialize cuda. {}", result);
 	return Err(CUDAError::NoDevice);
@@ -24,7 +24,7 @@ fn tensor_add() -> Result<(), CUDAError> {
 
     let cuda_device = cuda::Device::new(0)?;
 
-    let cap = cuda_device.getComputeCapability()?;
+    let cap = cuda_device.get_compute_capability()?;
 
     println!("Compute Capalibiliry. {}.{}", cap.0, cap.1);
     println!("Device name: {}.", cuda_device.get_name()?);
