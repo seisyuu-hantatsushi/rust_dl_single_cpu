@@ -1,5 +1,5 @@
 mod cuda;
-mod device;
+pub mod device;
 pub mod context;
 pub mod module;
 pub mod memory;

@@ -7,3 +7,9 @@ edition = "2021"
 
 [dependencies]
 cuda-sys = { path = "../cuda-sys" }
+
+[dependencies.uuid]
+version = "1.3.2"
+features = [
+	 "v4", "fast-rng", "macro-diagnostics"
+]
