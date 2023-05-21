@@ -19,8 +19,8 @@ impl Context {
     fn load_mutmal_function(module: Rc<cuda::Module>) -> Result<(usize, cuda::Function), CUDAError> {
 	let mut blocksize:usize = 32;
 	let matrix_muls = [
-	    //"matrixMul_bs32_64bit",
-	    //"matrixMul_bs16_64bit",
+	    "matrixMul_bs32_64bit",
+	    "matrixMul_bs16_64bit",
 	    "matrixMul_bs8_64bit",
 	];
 
@@ -185,35 +185,78 @@ impl Context {
     pub fn matmul<'a, T:num::Num>(&'a self, x:&Tensor<'a, T>, y:&Tensor<'a, T>) ->
 	Result<Tensor<'a, T>, CUDAError>
     {
-	assert_eq!(x.shape().len(), 2);
-	assert_eq!(y.shape().len(), 2);
-	assert_eq!(x.shape()[1], y.shape()[0]);
-	let dst_shape = vec![x.shape()[0],y.shape()[1]];
-	let z_tensor = Tensor::<T>::new(self, &dst_shape)?;
-	{
-	    let block = (self.matmul_block_size, self.matmul_block_size, 1);
-	    let grid  = (y.shape()[1]/self.matmul_block_size+1, x.shape()[0]/self.matmul_block_size+1, 1);
-	    let x_devmem = x.as_ref_devmem().borrow();
-	    let y_devmem = y.as_ref_devmem().borrow();
-	    let z_devmem = z_tensor.as_ref_devmem().borrow();
+	assert_eq!(x.shape().len(),y.shape().len());
+	if x.shape().len() == 2 {
+	    assert_eq!(x.shape()[1], y.shape()[0]);
+	    let dst_shape = vec![x.shape()[0],y.shape()[1]];
+	    let z_tensor = Tensor::<T>::new(self, &dst_shape)?;
+	    {
+		let block = (self.matmul_block_size, self.matmul_block_size, 1);
+		let grid  = (y.shape()[1]/self.matmul_block_size+1, x.shape()[0]/self.matmul_block_size+1, 1);
+		let x_devmem = x.as_ref_devmem().borrow();
+		let y_devmem = y.as_ref_devmem().borrow();
+		let z_devmem = z_tensor.as_ref_devmem().borrow();
 
-	    //println!("{:?}", grid);
-	    let args = vec![ cuda::execute::LaunchKernelArg::DeviceMemory(&z_devmem),
-			     cuda::execute::LaunchKernelArg::DeviceMemory(&x_devmem),
-			     cuda::execute::LaunchKernelArg::DeviceMemory(&y_devmem),
-			     cuda::execute::LaunchKernelArg::Int(x.shape()[0] as i32),
-			     cuda::execute::LaunchKernelArg::Int(x.shape()[1] as i32),
-			     cuda::execute::LaunchKernelArg::Int(y.shape()[1] as i32)];
-	    let result = cuda::execute::launch_kernel(&self.matmul_func.1,
-						      grid,
-						      block,
-						      args);
+		//println!("{:?}", grid);
+		let args = vec![ cuda::execute::LaunchKernelArg::DeviceMemory(&z_devmem),
+				 cuda::execute::LaunchKernelArg::DeviceMemory(&x_devmem),
+				 cuda::execute::LaunchKernelArg::DeviceMemory(&y_devmem),
+				 cuda::execute::LaunchKernelArg::Int(x.shape()[0] as i32),
+				 cuda::execute::LaunchKernelArg::Int(x.shape()[1] as i32),
+				 cuda::execute::LaunchKernelArg::Int(y.shape()[1] as i32)];
+		let result = cuda::execute::launch_kernel(&self.matmul_func.1,
+							  grid,
+							  block,
+							  args);
 
-	    if let Err(err) = result {
-		return Err(err);
+		if let Err(err) = result {
+		    return Err(err);
+		}
 	    }
+	    Ok(z_tensor)
+
 	}
-	Ok(z_tensor)
+	else if x.shape().len() > 2 {
+	    let x_ch_shape = &x.shape()[0..x.shape().len()-2];
+	    let y_ch_shape = &y.shape()[0..x.shape().len()-2];
+	    assert_eq!(x_ch_shape, y_ch_shape);
+	    let ch_size = x.shape()[0..x.shape().len()-2].iter().fold(1, |p,&e| p*e);
+	    let mut dst_shape = x_ch_shape.to_vec();
+	    let (m,l,n) = (x.shape()[x.shape().len()-2],
+			   x.shape()[x.shape().len()-1],
+			   y.shape()[y.shape().len()-1]);
+	    dst_shape.push(x.shape()[x.shape().len()-2]);
+	    dst_shape.push(y.shape()[y.shape().len()-1]);
+	    //println!("ch_size:{}", ch_size);
+	    //println!("dst_shape:{:?}",dst_shape);
+	    let z_tensor = Tensor::<T>::new(self, &dst_shape)?;
+	    {
+		let block = (self.matmul_block_size, self.matmul_block_size, 1);
+		let grid  = (n/self.matmul_block_size+1, m/self.matmul_block_size+1, ch_size);
+		let x_devmem = x.as_ref_devmem().borrow();
+		let y_devmem = y.as_ref_devmem().borrow();
+		let z_devmem = z_tensor.as_ref_devmem().borrow();
+		let args = vec![ cuda::execute::LaunchKernelArg::DeviceMemory(&z_devmem),
+				 cuda::execute::LaunchKernelArg::DeviceMemory(&x_devmem),
+				 cuda::execute::LaunchKernelArg::DeviceMemory(&y_devmem),
+				 cuda::execute::LaunchKernelArg::Int(m as i32),
+				 cuda::execute::LaunchKernelArg::Int(l as i32),
+				 cuda::execute::LaunchKernelArg::Int(n as i32)];
+		let result = cuda::execute::launch_kernel(&self.matmul_func.1,
+							  grid,
+							  block,
+							  args);
+
+		if let Err(err) = result {
+		    return Err(err);
+		}
+	    }
+	    Ok(z_tensor)
+	}
+	else {
+	    assert!(false);
+	    Err(CUDAError::InvalidValue)
+	}
     }
 }
 

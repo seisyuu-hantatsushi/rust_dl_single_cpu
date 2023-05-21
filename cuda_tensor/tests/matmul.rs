@@ -151,7 +151,7 @@ fn tensor_matmul() -> Result<(), CUDAError> {
         }
     }
 
-    if true {
+    if false {
         const M: usize = 19;
         const L: usize = 20;
         const N: usize = 17;
@@ -252,6 +252,148 @@ fn tensor_matmul() -> Result<(), CUDAError> {
             let end = start.elapsed();
 	    println!("gpu matmul {}.{:09}.", end.as_secs(), end.subsec_nanos());
 	    println!("{tensor_z}");
+
+            for (i,(&z1, &z2)) in tensor_z_host.iter().zip(tensor_z_dst.iter()).enumerate() {
+                if !((z1 - z2).abs() < 1.0e-4) {
+                    println!("({} {}) {}-{}", i/N, i%N, z1, z2);
+                    assert!((z1 - z2).abs() < 1.0e-5);
+                }
+            }
+        }
+    }
+
+    if true {
+	const C: usize = 3;
+	const M: usize = 9;
+        const L: usize = 12;
+        const N: usize = 10;
+
+	/*
+
+        let tensor_x_src: Vec<f32> = (0..C * M * L)
+            .map(|_| uniform_dist.sample(&mut rng))
+            .collect::<Vec<f32>>();
+        let tensor_y_src: Vec<f32> = (0..C * L * N)
+            .map(|_| uniform_dist.sample(&mut rng))
+            .collect::<Vec<f32>>();
+	 */
+
+        let tensor_x_src: Vec<f32> = (0..C * M * L)
+            .map(|i| (i/(M*L)+1) as f32 )
+            .collect::<Vec<f32>>();
+        let tensor_y_src: Vec<f32> = (0..C * L * N)
+            .map(|i| (i/(L*N)+1) as f32 )
+            .collect::<Vec<f32>>();
+
+	let mut tensor_z_dst: Vec<f32> = vec!();
+	let start = Instant::now();
+	for c in 0..C {
+	    let tensor_x_sub = &tensor_x_src[c * M * L .. (c + 1) * M * L];
+	    let tensor_y_sub = &tensor_y_src[c * L * N .. (c + 1) * L * N];
+
+	    //println!("{} {} {}", c * M * L, (c + 1) * M * L - 1, M * L);
+	    //println!("{} {}", tensor_x_sub.len(), tensor_y_sub.len());
+
+	    let tensor_z_sub = matmul(&tensor_x_sub, &tensor_y_sub, (M, L, N));
+	    tensor_z_dst.extend(tensor_z_sub);
+	}
+        let end = start.elapsed();
+        println!("cpu matmul {}.{:09}.", end.as_secs(), end.subsec_nanos());
+/*
+	for c in 0..C {
+	    let tensor_x_sub = &tensor_x_src[c * M * L .. (c + 1) * M * L];
+	    print!("[");
+	    for m in 0..M {
+		print!("  [");
+		for n in 0..L {
+		    print!("{} ",tensor_x_sub[m*L+n]);
+		}
+		print!("]\n");
+	    }
+	    print!("]\n");
+	}
+	
+	for c in 0..C {
+	    let tensor_z_sub = &tensor_z_dst[c * M * N .. (c + 1) * M * N];
+	    print!("[");
+	    for m in 0..M {
+		print!("  [");
+		for n in 0..N {
+		    print!("{} ",tensor_z_sub[m*N+n]);
+		}
+		print!("]\n");
+	    }
+	    print!("]\n");
+	}
+*/
+	{
+            let context = cuda_tensor::Context::new(Rc::clone(&cuda_context))?;
+            let mut tensor_x = context.create_tensor::<f32>(&[C, M, L])?;
+            tensor_x.set_elements(tensor_x_src)?;
+            let mut tensor_y = context.create_tensor::<f32>(&[C, L, N])?;
+            tensor_y.set_elements(tensor_y_src)?;
+
+	    //println!("{}", tensor_x);
+
+	    let start = Instant::now();
+            let tensor_z = cuda_tensor::tensor::matmul(&tensor_x, &tensor_y);
+            let tensor_z_host = tensor_z.get_elements()?;
+            let end = start.elapsed();
+	    println!("gpu matmul {}.{:09}.", end.as_secs(), end.subsec_nanos());
+	    //println!("{tensor_z}");
+
+            for (i,(&z1, &z2)) in tensor_z_host.iter().zip(tensor_z_dst.iter()).enumerate() {
+                if !((z1 - z2).abs() < 1.0e-4) {
+                    println!("({} {}) {}-{}", i/N, i%N, z1, z2);
+                    assert!((z1 - z2).abs() < 1.0e-5);
+                }
+            }
+        }
+    }
+
+    if true {
+	const C: usize = 3;
+	const M: usize = 65;
+        const L: usize = 129;
+        const N: usize = 33;
+
+        let tensor_x_src: Vec<f32> = (0..C * M * L)
+            .map(|_| uniform_dist.sample(&mut rng))
+            .collect::<Vec<f32>>();
+        let tensor_y_src: Vec<f32> = (0..C * L * N)
+            .map(|_| uniform_dist.sample(&mut rng))
+            .collect::<Vec<f32>>();
+
+	let mut tensor_z_dst: Vec<f32> = vec!();
+	let start = Instant::now();
+	for c in 0..C {
+	    let tensor_x_sub = &tensor_x_src[c * M * L .. (c + 1) * M * L];
+	    let tensor_y_sub = &tensor_y_src[c * L * N .. (c + 1) * L * N];
+
+	    //println!("{} {} {}", c * M * L, (c + 1) * M * L - 1, M * L);
+	    //println!("{} {}", tensor_x_sub.len(), tensor_y_sub.len());
+
+	    let tensor_z_sub = matmul(&tensor_x_sub, &tensor_y_sub, (M, L, N));
+	    tensor_z_dst.extend(tensor_z_sub);
+	}
+        let end = start.elapsed();
+        println!("cpu matmul {}.{:09}.", end.as_secs(), end.subsec_nanos());
+
+	{
+            let context = cuda_tensor::Context::new(Rc::clone(&cuda_context))?;
+            let mut tensor_x = context.create_tensor::<f32>(&[C, M, L])?;
+            tensor_x.set_elements(tensor_x_src)?;
+            let mut tensor_y = context.create_tensor::<f32>(&[C, L, N])?;
+            tensor_y.set_elements(tensor_y_src)?;
+
+	    //println!("{}", tensor_x);
+
+	    let start = Instant::now();
+            let tensor_z = cuda_tensor::tensor::matmul(&tensor_x, &tensor_y);
+            let tensor_z_host = tensor_z.get_elements()?;
+            let end = start.elapsed();
+	    println!("gpu matmul {}.{:09}.", end.as_secs(), end.subsec_nanos());
+	    //println!("{tensor_z}");
 
             for (i,(&z1, &z2)) in tensor_z_host.iter().zip(tensor_z_dst.iter()).enumerate() {
                 if !((z1 - z2).abs() < 1.0e-4) {
